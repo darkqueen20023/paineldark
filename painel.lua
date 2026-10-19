@@ -1,5 +1,5 @@
 -- ============================================
--- PAINEL COMPLETO v9 - STALKER & INVISÍVEL
+-- PAINEL COMPLETO v12 - INVISÍVEL SERVER-SIDE
 -- ============================================
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -7,6 +7,7 @@ local TweenService = game:GetService("TweenService")
 local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
 
 local LocalPlayer = Players.LocalPlayer
 local env = (getgenv and getgenv()) or _G
@@ -17,7 +18,7 @@ if env.PinkPanelGui then pcall(function() env.PinkPanelGui:Destroy() end) end
 local Theme = {
     Bg = Color3.fromRGB(14, 14, 18), TopBar = Color3.fromRGB(24, 24, 30), Row = Color3.fromRGB(28, 28, 35),
     Stroke = Color3.fromRGB(50, 50, 58), Off = Color3.fromRGB(55, 55, 64), Pink = Color3.fromRGB(255, 105, 180),
-    Text = Color3.fromRGB(255, 255, 255), TextGray = Color3.fromRGB(165, 165, 175)
+    Text = Color3.fromRGB(255, 255, 255), TextGray = Color3.fromRGB(165, 165, 175), Green = Color3.fromRGB(80, 200, 120), Red = Color3.fromRGB(220, 60, 60)
 }
 
 local function tween(obj, props) TweenService:Create(obj, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play() end
@@ -45,7 +46,7 @@ round(MainFrame, 12); stroke(MainFrame, Theme.Pink, 1.5)
 local TopBar = new("Frame", {Size = UDim2.new(1, 0, 0, 45), BackgroundColor3 = Theme.TopBar, BorderSizePixel = 0}, MainFrame)
 round(TopBar, 12)
 new("Frame", {Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Theme.Pink, BorderSizePixel = 0}, TopBar)
-new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v9", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
+new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v12", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
 
 local CloseBtn = new("TextButton", {Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(1, -38, 0.5, -14), BackgroundColor3 = Theme.Bg, Text = "✕", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false}, TopBar)
 round(CloseBtn, 6)
@@ -69,13 +70,13 @@ end)
 
 -- Notificações
 local function notify(text)
-    local t = new("TextLabel", {Size = UDim2.new(0, 280, 0, 38), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 50), BackgroundColor3 = Theme.TopBar, Text = text, TextColor3 = Theme.Text, Font = Enum.Font.GothamSemibold, TextSize = 13, ZIndex = 1000}, ScreenGui)
+    local t = new("TextLabel", {Size = UDim2.new(0, 280, 0, 38), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 50), BackgroundColor3 = Theme.TopBar, Text = text, TextColor3 = Theme.Text, Font = Enum.Font.GothamSemibold, TextSize = 13, ZIndex = 2000}, ScreenGui)
     round(t, 10); stroke(t, Theme.Pink, 1.2)
     tween(t, {Position = UDim2.new(0.5, 0, 1, -30)})
     task.delay(2.5, function() if t.Parent then tween(t, {Position = UDim2.new(0.5, 0, 1, 50)}); task.wait(0.3); t:Destroy() end end)
 end
 
--- Abas (Agora são 5)
+-- Abas
 local TabBar = new("Frame", {Size = UDim2.new(1, -20, 0, 34), Position = UDim2.new(0, 10, 0, 55), BackgroundTransparency = 1}, MainFrame)
 new("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, TabBar)
 local Body = new("Frame", {Size = UDim2.new(1, -20, 1, -100), Position = UDim2.new(0, 10, 0, 95), BackgroundTransparency = 1}, MainFrame)
@@ -140,102 +141,136 @@ local function getPos(obj)
 end
 
 -- ============================================
--- ABA 1: UTILIDADES
+-- VARIÁVEIS DE CONTROLE E INVISIBILIDADE
 -- ============================================
-local pageUtil = makePage("util", "⚙️ Util", 1)
-makeLabel(pageUtil, "— Utilidades —")
-makeToggle(pageUtil, "🔄 Anti-AFK", false, function(on)
-    if on then env.AntiAFK_Conn = LocalPlayer.Idled:Connect(function() pcall(function() VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new()) end) end)
-    else if env.AntiAFK_Conn then env.AntiAFK_Conn:Disconnect(); env.AntiAFK_Conn = nil end end
-end)
+local currentTarget = nil
+local StalkConnection = nil
+local isInvisibleServer = false
+local invisibleLoop = nil
+
+local function setServerInvisible(state)
+    isInvisibleServer = state
+    if invisibleLoop then task.cancel(invisibleLoop); invisibleLoop = nil end
+    
+    if state then
+        invisibleLoop = task.spawn(function()
+            while isInvisibleServer and ScreenGui.Parent do
+                if LocalPlayer.Character then
+                    for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
+                        if v:IsA("BasePart") then
+                            v.Transparency = 1
+                            v.CanCollide = false
+                        elseif v:IsA("Decal") or v:IsA("Texture") then
+                            v.Transparency = 1
+                        end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+        notify("👻 Invisibilidade Server-Side ATIVADA")
+    else
+        if LocalPlayer.Character then
+            for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.Transparency = 0
+                    v.CanCollide = true
+                elseif v:IsA("Decal") or v:IsA("Texture") then
+                    v.Transparency = 0
+                end
+            end
+        end
+        notify("👁️ Visibilidade RESTAURADA")
+    end
+end
 
 -- ============================================
--- ABA 2: JOGADORES (CORRIGIDA E COM BUSCA @)
+-- ABA 1: JOGADORES
 -- ============================================
-local pagePlayers = makePage("players", "👥 Players", 2)
+local pagePlayers = makePage("players", "👥 Players", 1)
 local playerFilter = ""
 local playerFrame = new("Frame", {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1}, pagePlayers)
 new("UIListLayout", {Padding = UDim.new(0, 4)}, playerFrame)
 
 local function rebuildPlayers()
     for _, c in ipairs(playerFrame:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-    -- Usa GetChildren() para garantir que pega TODOS os usuários do jogo
     for _, plr in ipairs(Players:GetChildren()) do
         if plr ~= LocalPlayer then
-            local display = plr.DisplayName
-            local username = plr.Name
-            -- Verifica se o filtro bate com o @username ou com o Nickname
+            local display = plr.DisplayName; local username = plr.Name
             if playerFilter == "" or username:lower():find(playerFilter, 1, true) or display:lower():find(playerFilter, 1, true) then
-                local row = makeButton(playerFrame, "➤ " .. display .. " (@" .. username .. ")", function()
-                    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    local tHRP = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-                    if myHRP and tHRP then forceTeleport(myHRP, tHRP.Position); notify("📍 TP: " .. username) end
+                makeButton(playerFrame, "➤ " .. display .. " (@" .. username .. ")", function()
+                    currentTarget = plr
+                    notify("🎯 Alvo selecionado: " .. username)
+                    selectTab("stalker") -- Pula para a aba Stalker ao clicar
                 end)
             end
         end
     end
 end
-
-makeSearch(pagePlayers, "Buscar por @nome ou Nick...", function(txt) playerFilter = txt:lower(); rebuildPlayers() end)
+makeSearch(pagePlayers, "Buscar @nome ou Nick...", function(txt) playerFilter = txt:lower(); rebuildPlayers() end)
 makeButton(pagePlayers, "🔃 Atualizar Lista", rebuildPlayers)
 rebuildPlayers()
 
 -- ============================================
--- ABA 3: STALKER & INVISÍVEL (NOVO)
+-- ABA 2: STALKER (ALVO E INVISÍVEL)
 -- ============================================
-local pageStalker = makePage("stalker", "🕵️ Stalker", 3)
-local stalkTarget = nil
-local isStalking = false
-local isInvisible = false
-
+local pageStalker = makePage("stalker", "🕵️ Stalker", 2)
 makeLabel(pageStalker, "— Alvo Atual —")
-local targetLabel = makeLabel(pageStalker, "Nenhum alvo selecionado", Theme.TextGray, 22)
+local targetDisplay = makeLabel(pageStalker, "Nenhum alvo selecionado (Vá em Players)", Theme.TextGray, 22)
 
-makeButton(pageStalker, "🎯 Definir Alvo (Buscar)", function()
-    local targetName = "alvo" -- Para simplificar, o stalker pega o primeiro player da lista com o nome que ele quiser, ou você pode integrar com a lista acima.
-    -- Aqui ele vai definir o primeiro player que não é você (você pode melhorar isso)
-    for _, p in ipairs(Players:GetChildren()) do
-        if p ~= LocalPlayer then
-            stalkTarget = p
-            targetLabel.Text = "Alvo: @" .. p.Name
-            notify("🎯 Alvo definido: " .. p.Name)
-            break
-        end
-    end
+local btnTPTarget = makeButton(pageStalker, "📍 Teleportar para o Alvo", function()
+    if currentTarget and currentTarget.Character then
+        local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local tHRP = currentTarget.Character:FindFirstChild("HumanoidRootPart")
+        if myHRP and tHRP then forceTeleport(myHRP, tHRP.Position); notify("📍 TP: " .. currentTarget.Name) end
+    else notify("⚠️ Selecione um alvo na aba Players") end
 end)
 
-makeLabel(pageStalker, "— Ações —")
-makeToggle(pageStalker, "👣 Seguir Alvo (Cola)", false, function(on)
-    if not stalkTarget then return notify("⚠️ Selecione um alvo primeiro!") end
-    isStalking = on
-    if on then
-        env.StalkLoop = RunService.Heartbeat:Connect(function()
-            if isStalking and stalkTarget.Character then
+local btnStalkToggle = makeButton(pageStalker, "👣 Grudar (Stalker)", function()
+    if not currentTarget or not currentTarget.Character then return notify("⚠️ Selecione um alvo válido") end
+    if StalkConnection then
+        StalkConnection:Disconnect(); StalkConnection = nil
+        btnStalkToggle.Text = "  👣 Grudar (Stalker)"
+        notify("⛔ Parou de grudar")
+    else
+        StalkConnection = RunService.Heartbeat:Connect(function()
+            if currentTarget and currentTarget.Character then
                 local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                local tHRP = stalkTarget.Character:FindFirstChild("HumanoidRootPart")
-                if myHRP and tHRP then
-                    myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3) -- Fica 3 studs atrás
-                end
+                local tHRP = currentTarget.Character:FindFirstChild("HumanoidRootPart")
+                if myHRP and tHRP then myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3) end
             end
         end)
-    else
-        if env.StalkLoop then env.StalkLoop:Disconnect(); env.StalkLoop = nil end
+        btnStalkToggle.Text = "  ⏹️ Parar de Grudar"
+        notify("👣 Grudando em " .. currentTarget.Name)
     end
 end)
 
-makeToggle(pageStalker, "👻 Ficar Invisível (Olhos dos outros)", false, function(on)
-    isInvisible = on
-    local function setInvisible(state)
-        if LocalPlayer.Character then
-            for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.LocalTransparencyModifier = state and 1 or 0
-                end
-            end
+local btnInvisServer = makeButton(pageStalker, "👻 Invisibilidade Server-Side", function()
+    setServerInvisible(not isInvisibleServer)
+    btnInvisServer.Text = isInvisibleServer and "  👁️ Ficar Visível" or "  👻 Invisibilidade Server-Side"
+end)
+
+-- Atualiza o texto do alvo em tempo real
+task.spawn(function()
+    while ScreenGui.Parent do
+        if currentTarget then
+            targetDisplay.Text = "👤 @" .. currentTarget.Name .. " (" .. currentTarget.DisplayName .. ")"
+            targetDisplay.TextColor3 = Theme.Pink
+        else
+            targetDisplay.Text = "Nenhum alvo selecionado"
+            targetDisplay.TextColor3 = Theme.TextGray
         end
+        task.wait(1)
     end
-    setInvisible(on)
-    if on then notify("👻 Você está invisível para o servidor") else notify("👁️ Você está visível") end
+end)
+
+-- ============================================
+-- ABA 3: UTILIDADES
+-- ============================================
+local pageUtil = makePage("util", "⚙️ Util", 3)
+makeToggle(pageUtil, "🔄 Anti-AFK", false, function(on)
+    if on then env.AntiAFK_Conn = LocalPlayer.Idled:Connect(function() pcall(function() VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new()) end) end)
+    else if env.AntiAFK_Conn then env.AntiAFK_Conn:Disconnect(); env.AntiAFK_Conn = nil end end
 end)
 
 -- ============================================
@@ -243,65 +278,53 @@ end)
 -- ============================================
 local pageFarm = makePage("farm", "🍬 Farm", 4)
 local isFarming = false
-
 makeToggle(pageFarm, "🍬 Auto-Farmar Doces (Candy)", false, function(on)
     isFarming = on
-    if on then
-        env.CandyLoop = task.spawn(function()
-            while isFarming and ScreenGui.Parent do
-                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    local candies = {}
-                    for _, obj in ipairs(workspace:GetDescendants()) do
-                        if obj.Name:lower():find("candy", 1, true) and (obj:IsA("BasePart") or obj:IsA("Model")) then table.insert(candies, obj) end
-                    end
-                    if #candies > 0 then
-                        local closest, dist = nil, math.huge
-                        for _, c in ipairs(candies) do
-                            local pos = getPos(c)
-                            if pos then local d = (pos - hrp.Position).Magnitude; if d < dist then dist = d; closest = pos end end
-                        end
-                        if closest then forceTeleport(hrp, closest) end
-                    end
-                end
-                task.wait(0.15)
-            end
-        end)
-    else
-        if env.CandyLoop then pcall(function() task.cancel(env.CandyLoop) end); env.CandyLoop = nil end
-    end
+    if on then env.CandyLoop = task.spawn(function() while isFarming and ScreenGui.Parent do local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart"); if hrp then local candies = {}; for _, obj in ipairs(workspace:GetDescendants()) do if obj.Name:lower():find("candy", 1, true) and (obj:IsA("BasePart") or obj:IsA("Model")) then table.insert(candies, obj) end end; if #candies > 0 then local closest, dist = nil, math.huge; for _, c in ipairs(candies) do local pos = getPos(c); if pos then local d = (pos - hrp.Position).Magnitude; if d < dist then dist = d; closest = pos end end end; if closest then forceTeleport(hrp, closest) end end end; task.wait(0.15) end end)
+    else if env.CandyLoop then pcall(function() task.cancel(env.CandyLoop) end); env.CandyLoop = nil end end
 end)
-
-makeLabel(pageFarm, "— Teleporte Manual p/ Doce —")
+makeLabel(pageFarm, "— Teleporte Manual —")
 local candyFrame = new("Frame", {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1}, pageFarm)
 new("UIListLayout", {Padding = UDim.new(0, 4)}, candyFrame)
-
-makeButton(pageFarm, "🔍 Escanear Doces no Mapa", function()
+makeButton(pageFarm, "🔍 Escanear Doces", function()
     for _, c in ipairs(candyFrame:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
     local found = 0
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj.Name:lower():find("candy", 1, true) and (obj:IsA("BasePart") or obj:IsA("Model")) then
             found += 1
-            makeButton(candyFrame, "📦 " .. obj.Name, function()
-                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if hrp and obj.Parent then
-                    local pos = getPos(obj)
-                    if pos then forceTeleport(hrp, pos); notify("TP p/ Doce!") end
-                end
-            end)
+            makeButton(candyFrame, "📦 " .. obj.Name, function() local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart"); if hrp and obj.Parent then local pos = getPos(obj); if pos then forceTeleport(hrp, pos); notify("TP p/ Doce!") end end end)
         end
     end
     notify(("🔍 %d doce(s) encontrado(s)!"):format(found))
 end)
 
 -- ============================================
--- ABA 5: CONFIG
+-- ABA 5: INFO
 -- ============================================
-local pageConfig = makePage("config", "⚙️ Config", 5)
-makeLabel(pageConfig, "— Painel —")
-makeButton(pageConfig, "❌ Fechar Painel", function() MainFrame.Visible = false; FloatBtn.Visible = true end)
-makeLabel(pageConfig, "— Info —", Theme.TextGray, 22)
-makeLabel(pageConfig, "Versão v9 - Stalker & Invisível", Theme.TextGray, 20)
+local pageInfo = makePage("info", "🩺 Info", 5)
+makeLabel(pageInfo, "— Servidor —")
+local serverInfo = makeLabel(pageInfo, "Carregando...", Theme.TextGray, 60)
+serverInfo.TextWrapped = true; serverInfo.TextXAlignment = Enum.TextXAlignment.Left
+makeLabel(pageInfo, "— Performance —")
+local fpsLabel = makeLabel(pageInfo, "FPS: Calculando...", Theme.Green, 22)
+local pingLabel = makeLabel(pageInfo, "Ping: Calculando...", Theme.Green, 22)
 
-selectTab("util")
-print("[Painel] v9 Completo carregado! 🌸")
+task.spawn(function()
+    while ScreenGui.Parent do
+        local fps = math.floor(1 / RunService.RenderStepped:Wait())
+        if fps > 50 then fpsLabel.TextColor3 = Theme.Green; fpsLabel.Text = "FPS: " .. fps .. " (Ótimo)" 
+        elseif fps > 30 then fpsLabel.TextColor3 = Color3.fromRGB(255, 200, 50); fpsLabel.Text = "FPS: " .. fps .. " (Médio)"
+        else fpsLabel.TextColor3 = Theme.Red; fpsLabel.Text = "FPS: " .. fps .. " (Ruim)" end
+
+        local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+        if ping < 100 then pingLabel.TextColor3 = Theme.Green; pingLabel.Text = "Ping: " .. ping .. " ms (Bom)"
+        elseif ping < 200 then pingLabel.TextColor3 = Color3.fromRGB(255, 200, 50); pingLabel.Text = "Ping: " .. ping .. " ms (Médio)"
+        else pingLabel.TextColor3 = Theme.Red; pingLabel.Text = "Ping: " .. ping .. " ms (Ruim)" end
+
+        serverInfo.Text = string.format("Place ID: %s\nJob ID: %s\nJogadores: %d/%d", tostring(game.PlaceId), game.JobId ~= "" and game.JobId:sub(1,8).."..." or "N/A", #Players:GetPlayers(), Players.MaxPlayers)
+        task.wait(1)
+    end
+end)
+
+selectTab("players")
+print("[Painel] v12 carregado com Stalker e Invisibilidade Server-Side! 🌸")
