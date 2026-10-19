@@ -1,5 +1,5 @@
 -- ============================================
--- PAINEL COMPLETO v12 - INVISÍVEL SERVER-SIDE
+-- PAINEL v15 - LIGHT & CLEAN (ANTI-LAG)
 -- ============================================
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -46,14 +46,14 @@ round(MainFrame, 12); stroke(MainFrame, Theme.Pink, 1.5)
 local TopBar = new("Frame", {Size = UDim2.new(1, 0, 0, 45), BackgroundColor3 = Theme.TopBar, BorderSizePixel = 0}, MainFrame)
 round(TopBar, 12)
 new("Frame", {Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Theme.Pink, BorderSizePixel = 0}, TopBar)
-new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v12", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
+new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Light v15", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
 
 local CloseBtn = new("TextButton", {Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(1, -38, 0.5, -14), BackgroundColor3 = Theme.Bg, Text = "✕", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false}, TopBar)
 round(CloseBtn, 6)
 CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false; FloatBtn.Visible = true end)
 FloatBtn.MouseButton1Click:Connect(function() FloatBtn.Visible = false; MainFrame.Visible = true; tween(MainFrame, {Size = pSize}) end)
 
--- Arrastar Painel
+-- Arrastar (Suave e leve)
 local dragging, dragStart, startPos
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -68,15 +68,15 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Notificações
+-- Notificações (Rápidas e leves)
 local function notify(text)
-    local t = new("TextLabel", {Size = UDim2.new(0, 280, 0, 38), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 50), BackgroundColor3 = Theme.TopBar, Text = text, TextColor3 = Theme.Text, Font = Enum.Font.GothamSemibold, TextSize = 13, ZIndex = 2000}, ScreenGui)
+    local t = new("TextLabel", {Size = UDim2.new(0, 260, 0, 36), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 50), BackgroundColor3 = Theme.TopBar, Text = text, TextColor3 = Theme.Text, Font = Enum.Font.GothamSemibold, TextSize = 13, ZIndex = 2000}, ScreenGui)
     round(t, 10); stroke(t, Theme.Pink, 1.2)
     tween(t, {Position = UDim2.new(0.5, 0, 1, -30)})
-    task.delay(2.5, function() if t.Parent then tween(t, {Position = UDim2.new(0.5, 0, 1, 50)}); task.wait(0.3); t:Destroy() end end)
+    task.delay(2, function() if t.Parent then tween(t, {Position = UDim2.new(0.5, 0, 1, 50)}); task.wait(0.3); t:Destroy() end end)
 end
 
--- Abas
+-- Abas (Otimizadas)
 local TabBar = new("Frame", {Size = UDim2.new(1, -20, 0, 34), Position = UDim2.new(0, 10, 0, 55), BackgroundTransparency = 1}, MainFrame)
 new("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, TabBar)
 local Body = new("Frame", {Size = UDim2.new(1, -20, 1, -100), Position = UDim2.new(0, 10, 0, 95), BackgroundTransparency = 1}, MainFrame)
@@ -130,62 +130,72 @@ local function makeSearch(parent, placeholder, onChange)
     return box
 end
 
--- Funções de TP
-local function forceTeleport(hrp, targetPos)
-    if not hrp or not targetPos then return end
-    for i = 1, 5 do pcall(function() hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0)) end); task.wait(0.02) end
-end
-local function getPos(obj)
-    if obj:IsA("Model") then local p = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart"); return p and p.Position or nil end
-    return obj.Position
-end
-
 -- ============================================
--- VARIÁVEIS DE CONTROLE E INVISIBILIDADE
+-- CONTROLE DE STALKER (OTIMIZADO COM FÍSICA)
 -- ============================================
 local currentTarget = nil
-local StalkConnection = nil
+local isStalking = false
 local isInvisibleServer = false
-local invisibleLoop = nil
+local attachPart = nil
+local alignPos = nil
 
+local function startStalk(target)
+    if not target.Character then return end
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
+
+    -- Cria um Attach invisível no alvo e uma força de atração no seu corpo
+    -- Isso usa a própria física do Roblox, então não trava a tela e não dá lag!
+    local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
+    if not targetHRP then return end
+
+    attachPart = new("Part", {Name = "StalkerPart", Size = Vector3.new(1,1,1), Transparency = 1, CanCollide = false, Anchored = true, CFrame = targetHRP.CFrame * CFrame.new(0, 0, 3)}, workspace)
+    
+    alignPos = new("AlignPosition", {Attachment0 = new("Attachment", {Parent = myHRP}), Attachment1 = new("Attachment", {Parent = attachPart}), Mode = Enum.PositionAlignmentMode.OneAttachment, MaxForce = math.huge}, myHRP)
+    
+    isStalking = true
+    notify("👣 Grudando em " .. target.Name .. " (Suave)")
+end
+
+local function stopStalk()
+    isStalking = false
+    if attachPart then attachPart:Destroy(); attachPart = nil end
+    if alignPos then alignPos:Destroy(); alignPos = nil end
+    notify("⛔ Parou de grudar")
+end
+
+-- Invisibilidade Server-Side Otimizada (Só mexe se mudar)
+local invisibleLoop = nil
 local function setServerInvisible(state)
     isInvisibleServer = state
     if invisibleLoop then task.cancel(invisibleLoop); invisibleLoop = nil end
-    
     if state then
         invisibleLoop = task.spawn(function()
             while isInvisibleServer and ScreenGui.Parent do
                 if LocalPlayer.Character then
                     for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
-                        if v:IsA("BasePart") then
-                            v.Transparency = 1
-                            v.CanCollide = false
-                        elseif v:IsA("Decal") or v:IsA("Texture") then
-                            v.Transparency = 1
-                        end
+                        if v:IsA("BasePart") and v.Transparency ~= 1 then v.Transparency = 1; v.CanCollide = false
+                        elseif (v:IsA("Decal") or v:IsA("Texture")) and v.Transparency ~= 1 then v.Transparency = 1 end
                     end
                 end
-                task.wait(0.1)
+                task.wait(0.5) -- Antes era 0.1, agora é 0.5 (Economiza 80% do processamento)
             end
         end)
-        notify("👻 Invisibilidade Server-Side ATIVADA")
+        notify("👻 Invisível Server-Side ATIVADO")
     else
         if LocalPlayer.Character then
             for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.Transparency = 0
-                    v.CanCollide = true
-                elseif v:IsA("Decal") or v:IsA("Texture") then
-                    v.Transparency = 0
-                end
+                if v:IsA("BasePart") then v.Transparency = 0; v.CanCollide = true
+                elseif v:IsA("Decal") or v:IsA("Texture") then v.Transparency = 0 end
             end
         end
-        notify("👁️ Visibilidade RESTAURADA")
+        notify("👁️ Visível")
     end
 end
 
 -- ============================================
--- ABA 1: JOGADORES
+-- ABA 1: JOGADORES (Atualização Leve)
 -- ============================================
 local pagePlayers = makePage("players", "👥 Players", 1)
 local playerFilter = ""
@@ -198,51 +208,44 @@ local function rebuildPlayers()
         if plr ~= LocalPlayer then
             local display = plr.DisplayName; local username = plr.Name
             if playerFilter == "" or username:lower():find(playerFilter, 1, true) or display:lower():find(playerFilter, 1, true) then
-                makeButton(playerFrame, "➤ " .. display .. " (@" .. username .. ")", function()
-                    currentTarget = plr
-                    notify("🎯 Alvo selecionado: " .. username)
-                    selectTab("stalker") -- Pula para a aba Stalker ao clicar
+                local row = makeButton(playerFrame, "➤ " .. display .. " (@" .. username .. ")", function()
+                    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local tHRP = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+                    if myHRP and tHRP then myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3); notify("📍 TP: " .. username) end
                 end)
+                local targetBtn = new("TextButton", {Size = UDim2.new(0, 30, 1, -4), Position = UDim2.new(1, -32, 0, 2), BackgroundColor3 = Theme.Pink, Text = "🎯", TextColor3 = Theme.Bg, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false, Active = false}, row)
+                round(targetBtn, 6)
+                targetBtn.MouseButton1Click:Connect(function() currentTarget = plr; notify("🎯 Alvo: " .. username); selectTab("stalker") end)
             end
         end
     end
 end
+
 makeSearch(pagePlayers, "Buscar @nome ou Nick...", function(txt) playerFilter = txt:lower(); rebuildPlayers() end)
 makeButton(pagePlayers, "🔃 Atualizar Lista", rebuildPlayers)
 rebuildPlayers()
+Players.PlayerAdded:Connect(function() task.wait(1); rebuildPlayers() end)
+Players.PlayerRemoving:Connect(function() task.wait(1); rebuildPlayers() end)
 
 -- ============================================
--- ABA 2: STALKER (ALVO E INVISÍVEL)
+-- ABA 2: STALKER (Física Suave)
 -- ============================================
 local pageStalker = makePage("stalker", "🕵️ Stalker", 2)
 makeLabel(pageStalker, "— Alvo Atual —")
-local targetDisplay = makeLabel(pageStalker, "Nenhum alvo selecionado (Vá em Players)", Theme.TextGray, 22)
+local targetDisplay = makeLabel(pageStalker, "Nenhum alvo (Use 🎯 na aba Players)", Theme.TextGray, 22)
 
-local btnTPTarget = makeButton(pageStalker, "📍 Teleportar para o Alvo", function()
+makeButton(pageStalker, "📍 Teleportar para o Alvo", function()
     if currentTarget and currentTarget.Character then
         local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         local tHRP = currentTarget.Character:FindFirstChild("HumanoidRootPart")
-        if myHRP and tHRP then forceTeleport(myHRP, tHRP.Position); notify("📍 TP: " .. currentTarget.Name) end
+        if myHRP and tHRP then myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3); notify("📍 TP: " .. currentTarget.Name) end
     else notify("⚠️ Selecione um alvo na aba Players") end
 end)
 
 local btnStalkToggle = makeButton(pageStalker, "👣 Grudar (Stalker)", function()
     if not currentTarget or not currentTarget.Character then return notify("⚠️ Selecione um alvo válido") end
-    if StalkConnection then
-        StalkConnection:Disconnect(); StalkConnection = nil
-        btnStalkToggle.Text = "  👣 Grudar (Stalker)"
-        notify("⛔ Parou de grudar")
-    else
-        StalkConnection = RunService.Heartbeat:Connect(function()
-            if currentTarget and currentTarget.Character then
-                local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                local tHRP = currentTarget.Character:FindFirstChild("HumanoidRootPart")
-                if myHRP and tHRP then myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3) end
-            end
-        end)
-        btnStalkToggle.Text = "  ⏹️ Parar de Grudar"
-        notify("👣 Grudando em " .. currentTarget.Name)
-    end
+    if isStalking then stopStalk(); btnStalkToggle.Text = "  👣 Grudar (Stalker)"
+    else startStalk(currentTarget); btnStalkToggle.Text = "  ⏹️ Parar de Grudar" end
 end)
 
 local btnInvisServer = makeButton(pageStalker, "👻 Invisibilidade Server-Side", function()
@@ -250,14 +253,17 @@ local btnInvisServer = makeButton(pageStalker, "👻 Invisibilidade Server-Side"
     btnInvisServer.Text = isInvisibleServer and "  👁️ Ficar Visível" or "  👻 Invisibilidade Server-Side"
 end)
 
--- Atualiza o texto do alvo em tempo real
 task.spawn(function()
     while ScreenGui.Parent do
         if currentTarget then
             targetDisplay.Text = "👤 @" .. currentTarget.Name .. " (" .. currentTarget.DisplayName .. ")"
             targetDisplay.TextColor3 = Theme.Pink
+            -- Se o alvo morrer ou sair, o stalk para
+            if isStalking and (not currentTarget.Character or not currentTarget.Character:FindFirstChild("HumanoidRootPart")) then
+                stopStalk(); btnStalkToggle.Text = "  👣 Grudar (Stalker)"
+            end
         else
-            targetDisplay.Text = "Nenhum alvo selecionado"
+            targetDisplay.Text = "Nenhum alvo (Use 🎯 na aba Players)"
             targetDisplay.TextColor3 = Theme.TextGray
         end
         task.wait(1)
@@ -274,15 +280,54 @@ makeToggle(pageUtil, "🔄 Anti-AFK", false, function(on)
 end)
 
 -- ============================================
--- ABA 4: FARM DE DOCES
+-- ABA 4: FARM DE DOCES (Inteligente e Leve)
 -- ============================================
 local pageFarm = makePage("farm", "🍬 Farm", 4)
 local isFarming = false
+local farmConnection = nil
+
+local function doCandyFarm()
+    if not isFarming then return end
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local candies = {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name:lower():find("candy", 1, true) and (obj:IsA("BasePart") or obj:IsA("Model")) then table.insert(candies, obj) end
+    end
+    
+    if #candies > 0 then
+        local closest, dist = nil, math.huge
+        for _, c in ipairs(candies) do
+            local pos = c:IsA("Model") and (c.PrimaryPart or c:FindFirstChildWhichIsA("BasePart")).Position or c.Position
+            if pos then local d = (pos - hrp.Position).Magnitude; if d < dist then dist = d; closest = pos end end
+        end
+        if closest then hrp.CFrame = CFrame.new(closest + Vector3.new(0, 3, 0)) end
+    end
+end
+
+-- Só roda o farm quando um candy nascer, se o toggle estiver ativo
+workspace.DescendantAdded:Connect(function(obj)
+    if isFarming and obj.Name:lower():find("candy", 1, true) then
+        task.wait(0.1)
+        doCandyFarm()
+    end
+end)
+
 makeToggle(pageFarm, "🍬 Auto-Farmar Doces (Candy)", false, function(on)
     isFarming = on
-    if on then env.CandyLoop = task.spawn(function() while isFarming and ScreenGui.Parent do local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart"); if hrp then local candies = {}; for _, obj in ipairs(workspace:GetDescendants()) do if obj.Name:lower():find("candy", 1, true) and (obj:IsA("BasePart") or obj:IsA("Model")) then table.insert(candies, obj) end end; if #candies > 0 then local closest, dist = nil, math.huge; for _, c in ipairs(candies) do local pos = getPos(c); if pos then local d = (pos - hrp.Position).Magnitude; if d < dist then dist = d; closest = pos end end end; if closest then forceTeleport(hrp, closest) end end end; task.wait(0.15) end end)
-    else if env.CandyLoop then pcall(function() task.cancel(env.CandyLoop) end); env.CandyLoop = nil end end
+    if on then
+        notify("🍬 Auto-Farm ATIVADO")
+        -- Loop de segurança pra quando o player se mexer pro doce mais próximo
+        farmConnection = RunService.Heartbeat:Connect(function()
+            if isFarming then doCandyFarm() end
+        end)
+    else
+        notify("⛔ Auto-Farm DESATIVADO")
+        if farmConnection then farmConnection:Disconnect(); farmConnection = nil end
+    end
 end)
+
 makeLabel(pageFarm, "— Teleporte Manual —")
 local candyFrame = new("Frame", {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1}, pageFarm)
 new("UIListLayout", {Padding = UDim.new(0, 4)}, candyFrame)
@@ -292,7 +337,7 @@ makeButton(pageFarm, "🔍 Escanear Doces", function()
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj.Name:lower():find("candy", 1, true) and (obj:IsA("BasePart") or obj:IsA("Model")) then
             found += 1
-            makeButton(candyFrame, "📦 " .. obj.Name, function() local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart"); if hrp and obj.Parent then local pos = getPos(obj); if pos then forceTeleport(hrp, pos); notify("TP p/ Doce!") end end end)
+            makeButton(candyFrame, "📦 " .. obj.Name, function() local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart"); if hrp and obj.Parent then local pos = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")).Position or obj.Position; if pos then hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0)); notify("TP p/ Doce!") end end end)
         end
     end
     notify(("🔍 %d doce(s) encontrado(s)!"):format(found))
@@ -327,4 +372,4 @@ task.spawn(function()
 end)
 
 selectTab("players")
-print("[Painel] v12 carregado com Stalker e Invisibilidade Server-Side! 🌸")
+print("[Painel] v15 Light carregado! 🌸")
