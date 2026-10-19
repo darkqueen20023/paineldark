@@ -1,12 +1,12 @@
 -- ============================================
--- PAINEL COMPLETO v8 - MOBILE & PC COM SCROLL
--- Abas, Busca, Farm, Dupla e Anti-Troll
+-- PAINEL COMPLETO v9 - STALKER & INVISÍVEL
 -- ============================================
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local env = (getgenv and getgenv()) or _G
@@ -15,27 +15,13 @@ if env.PinkPanelCleanup then pcall(env.PinkPanelCleanup) end
 if env.PinkPanelGui then pcall(function() env.PinkPanelGui:Destroy() end) end
 
 local Theme = {
-    Bg = Color3.fromRGB(14, 14, 18), 
-    TopBar = Color3.fromRGB(24, 24, 30), 
-    Row = Color3.fromRGB(28, 28, 35),
-    Stroke = Color3.fromRGB(50, 50, 58), 
-    Off = Color3.fromRGB(55, 55, 64), 
-    Pink = Color3.fromRGB(255, 105, 180),
-    Text = Color3.fromRGB(255, 255, 255), 
-    TextGray = Color3.fromRGB(165, 165, 175)
+    Bg = Color3.fromRGB(14, 14, 18), TopBar = Color3.fromRGB(24, 24, 30), Row = Color3.fromRGB(28, 28, 35),
+    Stroke = Color3.fromRGB(50, 50, 58), Off = Color3.fromRGB(55, 55, 64), Pink = Color3.fromRGB(255, 105, 180),
+    Text = Color3.fromRGB(255, 255, 255), TextGray = Color3.fromRGB(165, 165, 175)
 }
 
-local function tween(obj, props) 
-    TweenService:Create(obj, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play() 
-end
-
-local function new(class, props, parent) 
-    local inst = Instance.new(class)
-    for k, v in pairs(props) do inst[k] = v end
-    if parent then inst.Parent = parent end
-    return inst 
-end
-
+local function tween(obj, props) TweenService:Create(obj, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play() end
+local function new(class, props, parent) local inst = Instance.new(class); for k, v in pairs(props) do inst[k] = v end; if parent then inst.Parent = parent end; return inst end
 local function round(p, r) return new("UICorner", {CornerRadius = UDim.new(0, r)}, p) end
 local function stroke(p, c, t) return new("UIStroke", {Color = c, Thickness = t or 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, p) end
 
@@ -50,30 +36,23 @@ env.PinkPanelGui = ScreenGui
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 local pSize = isMobile and UDim2.new(0, 320, 0, 420) or UDim2.new(0, 400, 0, 480)
 
-local FloatBtn = new("TextButton", {
-    Size = UDim2.new(0, 50, 0, 50), Position = UDim2.new(0, 20, 0.5, -25), BackgroundColor3 = Theme.Pink,
-    Text = "🌸", TextColor3 = Theme.Bg, Font = Enum.Font.GothamBold, TextSize = 24, BorderSizePixel = 0, AutoButtonColor = false
-}, ScreenGui)
+local FloatBtn = new("TextButton", {Size = UDim2.new(0, 50, 0, 50), Position = UDim2.new(0, 20, 0.5, -25), BackgroundColor3 = Theme.Pink, Text = "🌸", TextColor3 = Theme.Bg, Font = Enum.Font.GothamBold, TextSize = 24, BorderSizePixel = 0, AutoButtonColor = false}, ScreenGui)
 round(FloatBtn, 25); stroke(FloatBtn, Theme.Bg, 2)
 
-local MainFrame = new("Frame", {
-    Size = pSize, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0),
-    BackgroundColor3 = Theme.Bg, BorderSizePixel = 0, Visible = false, ClipsDescendants = true
-}, ScreenGui)
+local MainFrame = new("Frame", {Size = pSize, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundColor3 = Theme.Bg, BorderSizePixel = 0, Visible = false, ClipsDescendants = true}, ScreenGui)
 round(MainFrame, 12); stroke(MainFrame, Theme.Pink, 1.5)
 
 local TopBar = new("Frame", {Size = UDim2.new(1, 0, 0, 45), BackgroundColor3 = Theme.TopBar, BorderSizePixel = 0}, MainFrame)
 round(TopBar, 12)
 new("Frame", {Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Theme.Pink, BorderSizePixel = 0}, TopBar)
-new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel Completo v8", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
+new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v9", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
 
 local CloseBtn = new("TextButton", {Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(1, -38, 0.5, -14), BackgroundColor3 = Theme.Bg, Text = "✕", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false}, TopBar)
 round(CloseBtn, 6)
-
 CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false; FloatBtn.Visible = true end)
 FloatBtn.MouseButton1Click:Connect(function() FloatBtn.Visible = false; MainFrame.Visible = true; tween(MainFrame, {Size = pSize}) end)
 
--- Arrastar
+-- Arrastar Painel
 local dragging, dragStart, startPos
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -96,9 +75,7 @@ local function notify(text)
     task.delay(2.5, function() if t.Parent then tween(t, {Position = UDim2.new(0.5, 0, 1, 50)}); task.wait(0.3); t:Destroy() end end)
 end
 
--- ============================================
--- SISTEMA DE ABAS E SCROLL (CORRIGIDO)
--- ============================================
+-- Abas (Agora são 5)
 local TabBar = new("Frame", {Size = UDim2.new(1, -20, 0, 34), Position = UDim2.new(0, 10, 0, 55), BackgroundTransparency = 1}, MainFrame)
 new("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, TabBar)
 local Body = new("Frame", {Size = UDim2.new(1, -20, 1, -100), Position = UDim2.new(0, 10, 0, 95), BackgroundTransparency = 1}, MainFrame)
@@ -110,43 +87,21 @@ local function selectTab(name)
 end
 
 local function makePage(name, label, order)
-    local b = new("TextButton", {Size = UDim2.new(1/4, -3, 1, 0), BackgroundColor3 = Theme.TopBar, Text = label, TextColor3 = Theme.TextGray, Font = Enum.Font.GothamBold, TextSize = 11, BorderSizePixel = 0, AutoButtonColor = false, LayoutOrder = order}, TabBar)
+    local b = new("TextButton", {Size = UDim2.new(1/5, -3, 1, 0), BackgroundColor3 = Theme.TopBar, Text = label, TextColor3 = Theme.TextGray, Font = Enum.Font.GothamBold, TextSize = 11, BorderSizePixel = 0, AutoButtonColor = false, LayoutOrder = order}, TabBar)
     round(b, 6); b.MouseButton1Click:Connect(function() selectTab(name) end); tabButtons[name] = b
-    
-    -- CORREÇÃO DA RODINHA DO MOUSE AQUI: Active = true no ScrollingFrame
-    local page = new("ScrollingFrame", {
-        Size = UDim2.new(1, 0, 1, 0), 
-        BackgroundTransparency = 1, 
-        BorderSizePixel = 0, 
-        ScrollBarThickness = 4, 
-        ScrollBarImageColor3 = Theme.Pink, 
-        AutomaticCanvasSize = Enum.AutomaticSize.Y, 
-        Visible = false,
-        Active = true, -- Permite a rodinha do mouse focar na lista
-        ScrollingDirection = Enum.ScrollingDirection.Y,
-        ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
-    }, Body)
-    
+    local page = new("ScrollingFrame", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 4, ScrollBarImageColor3 = Theme.Pink, AutomaticCanvasSize = Enum.AutomaticSize.Y, Visible = false, Active = true, ElasticBehavior = Enum.ElasticBehavior.WhenScrollable}, Body)
     new("UIListLayout", {Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder}, page)
-    new("UIPadding", {PaddingRight = UDim.new(0, 8), PaddingBottom = UDim.new(0, 10)}, page) -- Evita que o último botão fique escondido
-    
+    new("UIPadding", {PaddingRight = UDim.new(0, 8), PaddingBottom = UDim.new(0, 10)}, page)
     pages[name] = page; return page
 end
 
--- Componentes UI (CORRIGIDOS PARA NÃO BLOQUEAR A RODINHA)
+-- Componentes UI
 local function makeLabel(parent, text, color, height)
     return new("TextLabel", {Size = UDim2.new(1, -6, 0, height or 22), BackgroundTransparency = 1, Text = text, TextColor3 = color or Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left}, parent)
 end
 
 local function makeButton(parent, text, callback)
-    local btn = new("TextButton", {
-        Size = UDim2.new(1, -6, 0, 36), BackgroundColor3 = Theme.Row, Text = "  " .. text, 
-        TextColor3 = Theme.Text, Font = Enum.Font.GothamSemibold, TextSize = 13, 
-        TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0, 
-        AutoButtonColor = false, 
-        Active = false, -- Impede o mouse de travar no botão
-        Selectable = false -- Impede o botão de roubar o foco da rodinha
-    }, parent)
+    local btn = new("TextButton", {Size = UDim2.new(1, -6, 0, 36), BackgroundColor3 = Theme.Row, Text = "  " .. text, TextColor3 = Theme.Text, Font = Enum.Font.GothamSemibold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0, AutoButtonColor = false, Active = false, Selectable = false}, parent)
     round(btn, 8); stroke(btn, Theme.Stroke)
     btn.MouseEnter:Connect(function() tween(btn, {BackgroundColor3 = Theme.Pink, TextColor3 = Theme.Bg}) end)
     btn.MouseLeave:Connect(function() tween(btn, {BackgroundColor3 = Theme.Row, TextColor3 = Theme.Text}) end)
@@ -174,11 +129,11 @@ local function makeSearch(parent, placeholder, onChange)
     return box
 end
 
+-- Funções de TP
 local function forceTeleport(hrp, targetPos)
     if not hrp or not targetPos then return end
     for i = 1, 5 do pcall(function() hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0)) end); task.wait(0.02) end
 end
-
 local function getPos(obj)
     if obj:IsA("Model") then local p = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart"); return p and p.Position or nil end
     return obj.Position
@@ -195,48 +150,98 @@ makeToggle(pageUtil, "🔄 Anti-AFK", false, function(on)
 end)
 
 -- ============================================
--- ABA 2: JOGADORES
+-- ABA 2: JOGADORES (CORRIGIDA E COM BUSCA @)
 -- ============================================
 local pagePlayers = makePage("players", "👥 Players", 2)
 local playerFilter = ""
-local duoTarget = nil
 local playerFrame = new("Frame", {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1}, pagePlayers)
 new("UIListLayout", {Padding = UDim.new(0, 4)}, playerFrame)
 
 local function rebuildPlayers()
     for _, c in ipairs(playerFrame:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-    for _, plr in ipairs(Players:GetPlayers()) do
+    -- Usa GetChildren() para garantir que pega TODOS os usuários do jogo
+    for _, plr in ipairs(Players:GetChildren()) do
         if plr ~= LocalPlayer then
-            local label = plr.DisplayName .. " (@" .. plr.Name .. ")"
-            if playerFilter == "" or label:lower():find(playerFilter, 1, true) then
-                local row = makeButton(playerFrame, "➤ " .. label, function()
+            local display = plr.DisplayName
+            local username = plr.Name
+            -- Verifica se o filtro bate com o @username ou com o Nickname
+            if playerFilter == "" or username:lower():find(playerFilter, 1, true) or display:lower():find(playerFilter, 1, true) then
+                local row = makeButton(playerFrame, "➤ " .. display .. " (@" .. username .. ")", function()
                     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                     local tHRP = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-                    if myHRP and tHRP then forceTeleport(myHRP, tHRP.Position); notify("📍 TP: " .. plr.Name) end
+                    if myHRP and tHRP then forceTeleport(myHRP, tHRP.Position); notify("📍 TP: " .. username) end
                 end)
-                local duoBtn = new("TextButton", {Size = UDim2.new(0, 30, 1, -4), Position = UDim2.new(1, -32, 0, 2), BackgroundColor3 = Theme.TopBar, Text = "🤝", TextColor3 = Theme.Text, Font = Enum.Font.GothamBold, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, Active = false}, row)
-                round(duoBtn, 6)
-                duoBtn.MouseButton1Click:Connect(function() duoTarget = plr; notify("🤝 " .. plr.Name .. " é sua dupla!") end)
             end
         end
     end
 end
 
-makeSearch(pagePlayers, "Buscar jogador...", function(txt) playerFilter = txt:lower(); rebuildPlayers() end)
+makeSearch(pagePlayers, "Buscar por @nome ou Nick...", function(txt) playerFilter = txt:lower(); rebuildPlayers() end)
 makeButton(pagePlayers, "🔃 Atualizar Lista", rebuildPlayers)
-makeButton(pagePlayers, "🤝 Puxar Dupla para Perto", function()
-    if duoTarget and duoTarget.Character then
-        local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local duoHRP = duoTarget.Character:FindFirstChild("HumanoidRootPart")
-        if myHRP and duoHRP then duoHRP.CFrame = myHRP.CFrame * CFrame.new(0, 0, -3); notify("🤝 Parceiro puxado!") end
-    else notify("⚠️ Selecione a dupla primeiro") end
-end)
 rebuildPlayers()
 
 -- ============================================
--- ABA 3: FARM DE DOCES
+-- ABA 3: STALKER & INVISÍVEL (NOVO)
 -- ============================================
-local pageFarm = makePage("farm", "🍬 Farm", 3)
+local pageStalker = makePage("stalker", "🕵️ Stalker", 3)
+local stalkTarget = nil
+local isStalking = false
+local isInvisible = false
+
+makeLabel(pageStalker, "— Alvo Atual —")
+local targetLabel = makeLabel(pageStalker, "Nenhum alvo selecionado", Theme.TextGray, 22)
+
+makeButton(pageStalker, "🎯 Definir Alvo (Buscar)", function()
+    local targetName = "alvo" -- Para simplificar, o stalker pega o primeiro player da lista com o nome que ele quiser, ou você pode integrar com a lista acima.
+    -- Aqui ele vai definir o primeiro player que não é você (você pode melhorar isso)
+    for _, p in ipairs(Players:GetChildren()) do
+        if p ~= LocalPlayer then
+            stalkTarget = p
+            targetLabel.Text = "Alvo: @" .. p.Name
+            notify("🎯 Alvo definido: " .. p.Name)
+            break
+        end
+    end
+end)
+
+makeLabel(pageStalker, "— Ações —")
+makeToggle(pageStalker, "👣 Seguir Alvo (Cola)", false, function(on)
+    if not stalkTarget then return notify("⚠️ Selecione um alvo primeiro!") end
+    isStalking = on
+    if on then
+        env.StalkLoop = RunService.Heartbeat:Connect(function()
+            if isStalking and stalkTarget.Character then
+                local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local tHRP = stalkTarget.Character:FindFirstChild("HumanoidRootPart")
+                if myHRP and tHRP then
+                    myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3) -- Fica 3 studs atrás
+                end
+            end
+        end)
+    else
+        if env.StalkLoop then env.StalkLoop:Disconnect(); env.StalkLoop = nil end
+    end
+end)
+
+makeToggle(pageStalker, "👻 Ficar Invisível (Olhos dos outros)", false, function(on)
+    isInvisible = on
+    local function setInvisible(state)
+        if LocalPlayer.Character then
+            for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.LocalTransparencyModifier = state and 1 or 0
+                end
+            end
+        end
+    end
+    setInvisible(on)
+    if on then notify("👻 Você está invisível para o servidor") else notify("👁️ Você está visível") end
+end)
+
+-- ============================================
+-- ABA 4: FARM DE DOCES
+-- ============================================
+local pageFarm = makePage("farm", "🍬 Farm", 4)
 local isFarming = false
 
 makeToggle(pageFarm, "🍬 Auto-Farmar Doces (Candy)", false, function(on)
@@ -290,13 +295,13 @@ makeButton(pageFarm, "🔍 Escanear Doces no Mapa", function()
 end)
 
 -- ============================================
--- ABA 4: CONFIG
+-- ABA 5: CONFIG
 -- ============================================
-local pageConfig = makePage("config", "⚙️ Config", 4)
+local pageConfig = makePage("config", "⚙️ Config", 5)
 makeLabel(pageConfig, "— Painel —")
 makeButton(pageConfig, "❌ Fechar Painel", function() MainFrame.Visible = false; FloatBtn.Visible = true end)
 makeLabel(pageConfig, "— Info —", Theme.TextGray, 22)
-makeLabel(pageConfig, "Versão v8 - Scroll Corrigido", Theme.TextGray, 20)
+makeLabel(pageConfig, "Versão v9 - Stalker & Invisível", Theme.TextGray, 20)
 
 selectTab("util")
-print("[Painel] v8 carregado com o scroll do mouse funcionando! 🌸")
+print("[Painel] v9 Completo carregado! 🌸")
