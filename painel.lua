@@ -1,5 +1,5 @@
 -- ============================================
--- PAINEL v18 - ESTÁVEL & LEVE (ANTI-CRASH)
+-- PAINEL v19 - CORREÇÃO DE VISIBILIDADE
 -- ============================================
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -11,8 +11,6 @@ local Stats = game:GetService("Stats")
 
 local LocalPlayer = Players.LocalPlayer
 local env = (getgenv and getgenv()) or _G
-
--- SENHA DO ADMIN
 local ADMIN_PASSWORD = "admin123"
 
 if env.PinkPanelCleanup then pcall(env.PinkPanelCleanup) end
@@ -32,29 +30,63 @@ local function stroke(p, c, t) return new("UIStroke", {Color = c, Thickness = t 
 task.wait(1)
 
 -- GUI BASE
-local ScreenGui = new("ScreenGui", {Name = "PinkPanel", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 999})
-local ok = pcall(function() ScreenGui.Parent = (gethui and gethui()) or CoreGui end)
-if not ok then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+local ScreenGui = new("ScreenGui", {
+    Name = "PinkPanel", 
+    ResetOnSpawn = false, 
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, 
+    DisplayOrder = 999999 -- Fica acima de TUDO
+})
+
+-- Tenta colocar no CoreGui, se falhar coloca no PlayerGui
+local success = pcall(function()
+    ScreenGui.Parent = CoreGui
+end)
+if not success then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
 env.PinkPanelGui = ScreenGui
 
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 local pSize = isMobile and UDim2.new(0, 320, 0, 420) or UDim2.new(0, 400, 0, 480)
 
-local FloatBtn = new("TextButton", {Size = UDim2.new(0, 50, 0, 50), Position = UDim2.new(0, 20, 0.5, -25), BackgroundColor3 = Theme.Pink, Text = "🌸", TextColor3 = Theme.Bg, Font = Enum.Font.GothamBold, TextSize = 24, BorderSizePixel = 0, AutoButtonColor = false}, ScreenGui)
+-- Botão Flutuante (Sempre visível na tela)
+local FloatBtn = new("TextButton", {
+    Size = UDim2.new(0, 50, 0, 50), 
+    Position = UDim2.new(0, 20, 0.5, -25), 
+    BackgroundColor3 = Theme.Pink, 
+    Text = "🌸", TextColor3 = Theme.Bg, 
+    Font = Enum.Font.GothamBold, TextSize = 24, 
+    BorderSizePixel = 0, AutoButtonColor = false,
+    ZIndex = 999999
+}, ScreenGui)
 round(FloatBtn, 25); stroke(FloatBtn, Theme.Bg, 2)
 
-local MainFrame = new("Frame", {Size = pSize, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundColor3 = Theme.Bg, BorderSizePixel = 0, Visible = false, ClipsDescendants = true}, ScreenGui)
+-- Janela Principal
+local MainFrame = new("Frame", {
+    Size = pSize, 
+    AnchorPoint = Vector2.new(0.5, 0.5), 
+    Position = UDim2.new(0.5, 0, 0.5, 0), 
+    BackgroundColor3 = Theme.Bg, 
+    BorderSizePixel = 0, 
+    Visible = false, 
+    ClipsDescendants = true,
+    ZIndex = 999998
+}, ScreenGui)
 round(MainFrame, 12); stroke(MainFrame, Theme.Pink, 1.5)
 
 local TopBar = new("Frame", {Size = UDim2.new(1, 0, 0, 45), BackgroundColor3 = Theme.TopBar, BorderSizePixel = 0}, MainFrame)
 round(TopBar, 12)
 new("Frame", {Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Theme.Pink, BorderSizePixel = 0}, TopBar)
-new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v18", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
+new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v19", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
 
 local CloseBtn = new("TextButton", {Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(1, -38, 0.5, -14), BackgroundColor3 = Theme.Bg, Text = "✕", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false}, TopBar)
 round(CloseBtn, 6)
 CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false; FloatBtn.Visible = true end)
-FloatBtn.MouseButton1Click:Connect(function() FloatBtn.Visible = false; MainFrame.Visible = true; tween(MainFrame, {Size = pSize}) end)
+FloatBtn.MouseButton1Click:Connect(function() 
+    FloatBtn.Visible = false
+    MainFrame.Visible = true
+    tween(MainFrame, {Size = pSize})
+end)
 
 -- Arrastar
 local dragging, dragStart, startPos
@@ -73,7 +105,7 @@ end)
 
 -- Notificações
 local function notify(text)
-    local t = new("TextLabel", {Size = UDim2.new(0, 260, 0, 36), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 50), BackgroundColor3 = Theme.TopBar, Text = text, TextColor3 = Theme.Text, Font = Enum.Font.GothamSemibold, TextSize = 13, ZIndex = 2000}, ScreenGui)
+    local t = new("TextLabel", {Size = UDim2.new(0, 260, 0, 36), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 50), BackgroundColor3 = Theme.TopBar, Text = text, TextColor3 = Theme.Text, Font = Enum.Font.GothamSemibold, TextSize = 13, ZIndex = 999999}, ScreenGui)
     round(t, 10); stroke(t, Theme.Pink, 1.2)
     tween(t, {Position = UDim2.new(0.5, 0, 1, -30)})
     task.delay(2, function() if t.Parent then tween(t, {Position = UDim2.new(0.5, 0, 1, 50)}); task.wait(0.3); t:Destroy() end end)
@@ -141,7 +173,7 @@ local loginFrame = new("Frame", {Size = UDim2.new(1, -6, 0, 180), BackgroundTran
 local contentFrame = new("Frame", {Size = UDim2.new(1, -6, 0, 0), BackgroundTransparency = 1, Visible = false}, pageAdmin)
 new("UIListLayout", {Padding = UDim.new(0, 6)}, contentFrame)
 
-local loginLabel = makeLabel(loginFrame, "Digite a senha de Administrador:", Theme.TextGray, 30)
+makeLabel(loginFrame, "Digite a senha de Administrador:", Theme.TextGray, 30)
 local passBox = new("TextBox", {Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 35), BackgroundColor3 = Theme.Row, PlaceholderText = "Senha...", PlaceholderColor3 = Theme.TextGray, Text = "", TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 14, ClearTextOnFocus = true, BorderSizePixel = 0}, loginFrame)
 round(passBox, 8); stroke(passBox, Theme.Stroke)
 
@@ -155,38 +187,28 @@ loginBtn.MouseButton1Click:Connect(function()
     else notify("❌ Senha incorreta!") end
 end)
 
--- EXTRATOR DE IDS LEVE
 local function copyToClipboard(text)
     if setclipboard then setclipboard(text); notify("📋 Copiado!") 
-    else notify("⚠️ Executor sem suporte a cópia."); print("[ADM] Texto:\n" .. text) end
+    else notify("⚠️ Executor sem suporte."); print("[ADM] Texto:\n" .. text) end
 end
 
 makeLabel(contentFrame, "— Extrator de IDs —", Theme.Green)
 
 makeButton(contentFrame, "🔍 Escanear Workspace (Leve)", function()
-    notify("⏳ Escaneando... (Seguro)")
+    notify("⏳ Escaneando...")
     task.spawn(function()
         local parts, tools, anims = {}, {}, {}
         local count = 0
-        
-        -- Lê apenas o Workspace para não crashar
         for _, obj in ipairs(workspace:GetDescendants()) do
             count += 1
             if obj:IsA("BasePart") then table.insert(parts, obj.Name)
             elseif obj:IsA("Tool") then table.insert(tools, obj.Name)
             elseif obj:IsA("Animation") then table.insert(anims, obj.Name .. " (" .. obj.AnimationId .. ")") end
-            
-            -- Pausa a cada 1000 itens para não travar o celular
             if count % 1000 == 0 then task.wait(0.1) end
         end
-        
-        local strParts = table.concat(parts, "\n")
-        local strTools = table.concat(tools, "\n")
-        local strAnims = table.concat(anims, "\n")
-        
-        makeButton(contentFrame, "📋 Copiar " .. #parts .. " Parts", function() copyToClipboard(strParts) end)
-        makeButton(contentFrame, "📋 Copiar " .. #tools .. " Tools", function() copyToClipboard(strTools) end)
-        makeButton(contentFrame, "📋 Copiar " .. #anims .. " Anims", function() copyToClipboard(strAnims) end)
+        makeButton(contentFrame, "📋 Copiar " .. #parts .. " Parts", function() copyToClipboard(table.concat(parts, "\n")) end)
+        makeButton(contentFrame, "📋 Copiar " .. #tools .. " Tools", function() copyToClipboard(table.concat(tools, "\n")) end)
+        makeButton(contentFrame, "📋 Copiar " .. #anims .. " Anims", function() copyToClipboard(table.concat(anims, "\n")) end)
         notify(("✅ %d Parts, %d Tools, %d Anims"):format(#parts, #tools, #anims))
     end)
 end)
@@ -374,7 +396,6 @@ task.spawn(function()
     end
 end)
 
--- Atualiza o alvo na tela
 task.spawn(function()
     while ScreenGui.Parent do
         if currentTarget then
@@ -389,4 +410,4 @@ task.spawn(function()
 end)
 
 selectTab("players")
-print("[Painel] v18 - Anti-Crash Carregado! 🌸")
+print("[Painel] v19 - Tela de Visibilidade Forçada Carregada! 🌸")
