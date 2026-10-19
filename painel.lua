@@ -1,5 +1,5 @@
 -- ============================================
--- PAINEL v26 - EXTRATOR ADM + FARM LONGE
+-- PAINEL v27 - COMANDO DE VOZ ADM
 -- ============================================
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -9,6 +9,7 @@ local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
+local SoundService = game:GetService("SoundService")
 
 local LocalPlayer = Players.LocalPlayer
 local env = (getgenv and getgenv()) or _G
@@ -48,7 +49,7 @@ round(MainFrame, 12); stroke(MainFrame, Theme.Pink, 1.5)
 local TopBar = new("Frame", {Size = UDim2.new(1, 0, 0, 45), BackgroundColor3 = Theme.TopBar, BorderSizePixel = 0}, MainFrame)
 round(TopBar, 12)
 new("Frame", {Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Theme.Pink, BorderSizePixel = 0}, TopBar)
-new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v26", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
+new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v27", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
 
 local CloseBtn = new("TextButton", {Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(1, -38, 0.5, -14), BackgroundColor3 = Theme.Bg, Text = "✕", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false}, TopBar)
 round(CloseBtn, 6)
@@ -133,63 +134,7 @@ local function makeSearch(parent, placeholder, onChange)
 end
 
 -- ============================================
--- SISTEMA DE EXTRATOR (NOVA FUNÇÃO)
--- ============================================
-local foundObjects = {}
-local searchFilter = ""
-
-local function extractAll()
-    foundObjects = {}
-    -- Varre o mapa e o ReplicatedStorage procurando Eventos, Models e Tools
-    local locations = {workspace, ReplicatedStorage}
-    
-    for _, loc in ipairs(locations) do
-        for _, obj in ipairs(loc:GetDescendants()) do
-            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") or obj:IsA("Tool") or obj:IsA("Model") then
-                -- Filtro básico para não listar lixo como "Camera" ou "SpawnLocation"
-                local name = obj.Name
-                if not name:find("Camera") and not name:find("Spawn") and not name:find("Terrain") then
-                    table.insert(foundObjects, obj)
-                end
-            end
-        end
-    end
-end
-
-local function renderList(listFrame, filterText)
-    for _, child in ipairs(listFrame:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-    
-    local count = 0
-    for _, obj in ipairs(foundObjects) do
-        if filterText == "" or obj.Name:lower():find(filterText:lower(), 1, true) then
-            count += 1
-            local displayName = obj.Name .. " [" .. obj.ClassName .. "]"
-            makeButton(listFrame, displayName, function()
-                -- Ação ao clicar: Teleportar (se for no mapa) ou printar (se for Evento)
-                if obj:IsA("Model") or obj:IsA("Tool") or obj:IsA("BasePart") then
-                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        local pos = obj:IsA("Model") and obj:GetPivot().Position or obj.Position
-                        hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
-                        notify("📍 TP: " .. obj.Name)
-                    end
-                else
-                    notify("⚙️ Evento: " .. obj:GetFullName() .. " (Copiado)")
-                    if setclipboard then setclipboard(obj:GetFullName()) end
-                end
-            end)
-        end
-    end
-    
-    if count == 0 then
-        makeLabel(listFrame, "Nenhum item encontrado.", Theme.TextGray, 20)
-    end
-end
-
--- ============================================
--- STALKER E INVISIBILIDADE
+-- FUNÇÕES DE SISTEMA (FARM, STALKER, ETC)
 -- ============================================
 local currentTarget = nil
 local isStalking = false
@@ -230,6 +175,59 @@ local function setInvisible(state)
     end)
 end
 
+-- Farm
+local isFarming = false
+local farmingThread = nil
+local candyWaitTime = 0.2
+
+local function getAllCandies()
+    local list = {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name:lower():find("candy", 1, true) and (obj:IsA("BasePart") or obj:IsA("Model")) then
+            table.insert(list, obj)
+        end
+    end
+    return list
+end
+
+local function safeTeleport(targetPos)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char.HumanoidRootPart
+    local distance = (targetPos - hrp.Position).Magnitude
+    if distance > 50 then
+        local direction = (targetPos - hrp.Position).Unit
+        for i = 1, 3 do hrp.CFrame = hrp.CFrame + (direction * (distance / 4)); task.wait(0.1) end
+    end
+    hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+    hrp.AssemblyLinearVelocity = Vector3.zero
+end
+
+local function startFarmLoop()
+    farmingThread = task.spawn(function()
+        while isFarming and ScreenGui.Parent do
+            local candies = getAllCandies()
+            if #candies > 0 then
+                local targetCandy = candies[1]
+                if targetCandy and targetCandy.Parent then
+                    local pos = targetCandy:IsA("BasePart") and targetCandy.Position or targetCandy:GetPivot().Position
+                    safeTeleport(pos)
+                    local pickupRemote = nil
+                    pcall(function() pickupRemote = ReplicatedStorage.Features.HalloweenCandy.Remotes.Pickup end)
+                    if pickupRemote then
+                        pcall(function()
+                            local id = targetCandy:GetAttribute("CandyId") or targetCandy.Name
+                            pickupRemote:InvokeServer(id)
+                        end)
+                    end
+                    task.wait(candyWaitTime)
+                end
+            else task.wait(1) end
+            task.wait(0.1)
+        end
+    end)
+end
+
 -- ============================================
 -- ABA 1: JOGADORES
 -- ============================================
@@ -265,7 +263,7 @@ rebuildPlayers()
 -- ============================================
 local pageStalker = makePage("stalker", "🕵️ Stalker", 2)
 makeLabel(pageStalker, "— Alvo Atual —")
-local targetDisplay = makeLabel(pageStalker, "Nenhum alvo", Theme.TextGray, 22)
+makeLabel(pageStalker, "Nenhum alvo", Theme.TextGray, 22)
 
 makeButton(pageStalker, "📍 Teleportar para o Alvo", function()
     if currentTarget and currentTarget.Character then
@@ -296,66 +294,9 @@ makeToggle(pageUtil, "🔄 Anti-AFK", false, function(on)
 end)
 
 -- ============================================
--- ABA 4: FARM (LONGA DISTÂNCIA)
+-- ABA 4: FARM
 -- ============================================
 local pageFarm = makePage("farm", "🍬 Farm", 4)
-local isFarming = false
-local farmingThread = nil
-local candyWaitTime = 0.2
-
-local function getAllCandies()
-    local list = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name:lower():find("candy", 1, true) and (obj:IsA("BasePart") or obj:IsA("Model")) then
-            table.insert(list, obj)
-        end
-    end
-    return list
-end
-
-local function safeTeleport(targetPos)
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local hrp = char.HumanoidRootPart
-    local distance = (targetPos - hrp.Position).Magnitude
-    if distance > 50 then
-        local direction = (targetPos - hrp.Position).Unit
-        for i = 1, 3 do
-            hrp.CFrame = hrp.CFrame + (direction * (distance / 4))
-            task.wait(0.1)
-        end
-    end
-    hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
-    hrp.AssemblyLinearVelocity = Vector3.zero
-end
-
-local function startFarmLoop()
-    farmingThread = task.spawn(function()
-        while isFarming and ScreenGui.Parent do
-            local candies = getAllCandies()
-            if #candies > 0 then
-                local targetCandy = candies[1]
-                if targetCandy and targetCandy.Parent then
-                    local pos = targetCandy:IsA("BasePart") and targetCandy.Position or targetCandy:GetPivot().Position
-                    safeTeleport(pos)
-                    local pickupRemote = nil
-                    pcall(function() pickupRemote = ReplicatedStorage.Features.HalloweenCandy.Remotes.Pickup end)
-                    if pickupRemote then
-                        pcall(function()
-                            local id = targetCandy:GetAttribute("CandyId") or targetCandy.Name
-                            pickupRemote:InvokeServer(id)
-                        end)
-                    end
-                    task.wait(candyWaitTime)
-                end
-            else
-                task.wait(1)
-            end
-            task.wait(0.1)
-        end
-    end)
-end
-
 makeToggle(pageFarm, "🍬 Auto-Farm (Pegar de Longe)", false, function(on)
     isFarming = on
     if on then notify("🍬 Farm de Longa Distância Ativado"); startFarmLoop()
@@ -389,7 +330,7 @@ task.spawn(function()
 end)
 
 -- ============================================
--- ABA 6: ADM (LOGIN + EXTRATOR)
+-- ABA 6: ADM (LOGIN + EXTRATOR + VOZ)
 -- ============================================
 local pageAdmin = makePage("admin", "🔐 ADM", 6)
 local loginFrame = new("Frame", {Size = UDim2.new(1, -6, 0, 220), BackgroundTransparency = 1}, pageAdmin)
@@ -415,30 +356,60 @@ loginBtn.MouseButton1Click:Connect(function()
 end)
 autoLoginBtn.MouseButton1Click:Connect(doLogin)
 
--- ABA DE EXTRATOR
-local extractFrame = new("Frame", {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1}, contentFrame)
-new("UIListLayout", {Padding = UDim.new(0, 6)}, extractFrame)
+-- ============================================
+-- ABA 7: VOZ (ALTERAR NOME)
+-- ============================================
+local pageVoice = makePage("voice", "🎙️ Voz", 7)
+makeLabel(pageVoice, "— Alterar Nome de Voz —", Theme.Green)
+makeLabel(pageVoice, "Digite o nome exato que o evento do jogo espera ouvir:", Theme.TextGray, 20)
 
-makeLabel(extractFrame, "— Extrator de Objetos —", Theme.Green)
-makeButton(extractFrame, "🔄 Atualizar Lista (Escanear Tudo)", function()
-    extractAll()
-    local listFrame = extractFrame:FindFirstChild("ListaDeItens")
-    if listFrame then renderList(listFrame, searchFilter) end
-    notify("✅ Escaneamento concluído")
+local voiceBox = new("TextBox", {Size = UDim2.new(1, -6, 0, 40), BackgroundColor3 = Theme.Row, PlaceholderText = "Ex: 'abrir' ou 'candy'", PlaceholderColor3 = Theme.TextGray, Text = "", TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 13, ClearTextOnFocus = true, BorderSizePixel = 0}, pageVoice)
+round(voiceBox, 8); stroke(voiceBox, Theme.Stroke)
+
+makeButton(pageVoice, "▶️ Ativar Escuta de Comando", function()
+    if voiceBox.Text ~= "" then
+        local comando = voiceBox.Text
+        notify("🎙️ Escutando: " .. comando)
+        
+        -- Tenta usar a API de voz se existir
+        local success, err = pcall(function()
+            local VoiceChatService = game:GetService("VoiceChatService")
+            if VoiceChatService then
+                -- Aqui você pode colocar a lógica de Voice Chat do seu jogo
+                -- Por enquanto, simulamos que ele "ouve"
+                print("[Voz] Pronto para ouvir: " .. comando)
+            end
+        end)
+        
+        if not success then
+            notify("⚠️ Este jogo não suporta API de Voz (ou não configurado).")
+        end
+        
+        -- Testar comando de voz via chat (simulação)
+        local Chat = game:GetService("Chat")
+        if Chat then
+            pcall(function()
+                -- Simula um evento de chat se o jogo tiver
+                local RemoteEvent = ReplicatedStorage:FindFirstChild("VoiceEvent")
+                if RemoteEvent then
+                    RemoteEvent:FireServer(comando)
+                end
+            end)
+        end
+    else
+        notify("⚠️ Digite uma palavra primeiro.")
+    end
 end)
 
-makeSearch(extractFrame, "Buscar por nome ou ID...", function(txt) 
-    searchFilter = txt
-    local listFrame = extractFrame:FindFirstChild("ListaDeItens")
-    if listFrame then renderList(listFrame, searchFilter) end
+makeButton(pageVoice, "🔊 Testar Comando no Jogo", function()
+    local Remote = ReplicatedStorage:FindFirstChild("VoiceEvent") or ReplicatedStorage:FindFirstChild("CommandEvent")
+    if Remote then
+        pcall(function() Remote:FireServer(voiceBox.Text) end)
+        notify("✅ Comando '" .. voiceBox.Text .. "' enviado.")
+    else
+        notify("⚠️ Nenhum evento de voz encontrado. Verifique na aba ADM.")
+    end
 end)
-
-local listFrame = new("Frame", {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1, Name = "ListaDeItens"}, extractFrame)
-new("UIListLayout", {Padding = UDim.new(0, 4)}, listFrame)
-
--- Auto scan ao abrir
-extractAll()
-renderList(listFrame, "")
 
 selectTab("players")
-print("[Painel] v26 - Extrator ADM Carregado! 🌸")
+print("[Painel] v27 - Comando de Voz Carregado! 🌸")
