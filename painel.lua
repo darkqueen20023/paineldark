@@ -1,8 +1,9 @@
 -- ============================================
--- PAINEL v19 - CORREÇÃO DE VISIBILIDADE
+-- PAINEL v22 - FARM CARLÃO + DESIGN ROSA
 -- ============================================
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
@@ -15,6 +16,24 @@ local ADMIN_PASSWORD = "admin123"
 
 if env.PinkPanelCleanup then pcall(env.PinkPanelCleanup) end
 if env.PinkPanelGui then pcall(function() env.PinkPanelGui:Destroy() end) end
+
+-- PONTOS DO MAPA (DO SCRIPT DO CARLÃO)
+local locations = {
+    Vector3.new(-241.42, 2.44, 669.50), Vector3.new(-420.68, 19.17, 270.95),
+    Vector3.new(-171.58, 2.77, -261.09), Vector3.new(-380.24, 5.95, -414.02),
+    Vector3.new(347.10, 23.21, -377.64), Vector3.new(609.80, 2.28, 10.63),
+    Vector3.new(420.49, 30.71, 196.22), Vector3.new(302.75, 13.96, 575.04),
+    Vector3.new(224.29, 4.44, 1034.41), Vector3.new(11.99, 2.40, 834.86),
+    Vector3.new(-84.31, 5.34, 687.68), Vector3.new(-114.36, 23.64, 568.91),
+    Vector3.new(-21.33, 11.65, 305.46), Vector3.new(101.01, 4.27, 185.55),
+    Vector3.new(266.05, 29.58, 246.06), Vector3.new(333.54, 29.13, 401.32),
+    Vector3.new(113.40, 26.55, 75.11), Vector3.new(23.84, 13.19, -151.98),
+    Vector3.new(-32.49, 53.84, -110.31), Vector3.new(-436.67, 17.89, 113.28),
+    Vector3.new(-697.01, 8.01, -29.37), Vector3.new(-596.79, 6.04, -330.12),
+    Vector3.new(-690.92, 24.55, 468.41), Vector3.new(-388.16, 5.85, 1023.50),
+    Vector3.new(-121.28, 15.16, 1039.57), Vector3.new(88.14, 6.49, 1017.44),
+    Vector3.new(100.07, 2.70, 815.04)
+}
 
 local Theme = {
     Bg = Color3.fromRGB(14, 14, 18), TopBar = Color3.fromRGB(24, 24, 30), Row = Color3.fromRGB(28, 28, 35),
@@ -30,63 +49,29 @@ local function stroke(p, c, t) return new("UIStroke", {Color = c, Thickness = t 
 task.wait(1)
 
 -- GUI BASE
-local ScreenGui = new("ScreenGui", {
-    Name = "PinkPanel", 
-    ResetOnSpawn = false, 
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, 
-    DisplayOrder = 999999 -- Fica acima de TUDO
-})
-
--- Tenta colocar no CoreGui, se falhar coloca no PlayerGui
-local success = pcall(function()
-    ScreenGui.Parent = CoreGui
-end)
-if not success then
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-end
+local ScreenGui = new("ScreenGui", {Name = "PinkPanel", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 999999})
+local ok = pcall(function() ScreenGui.Parent = (gethui and gethui()) or CoreGui end)
+if not ok then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 env.PinkPanelGui = ScreenGui
 
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 local pSize = isMobile and UDim2.new(0, 320, 0, 420) or UDim2.new(0, 400, 0, 480)
 
--- Botão Flutuante (Sempre visível na tela)
-local FloatBtn = new("TextButton", {
-    Size = UDim2.new(0, 50, 0, 50), 
-    Position = UDim2.new(0, 20, 0.5, -25), 
-    BackgroundColor3 = Theme.Pink, 
-    Text = "🌸", TextColor3 = Theme.Bg, 
-    Font = Enum.Font.GothamBold, TextSize = 24, 
-    BorderSizePixel = 0, AutoButtonColor = false,
-    ZIndex = 999999
-}, ScreenGui)
+local FloatBtn = new("TextButton", {Size = UDim2.new(0, 50, 0, 50), Position = UDim2.new(0, 20, 0.5, -25), BackgroundColor3 = Theme.Pink, Text = "🌸", TextColor3 = Theme.Bg, Font = Enum.Font.GothamBold, TextSize = 24, BorderSizePixel = 0, AutoButtonColor = false}, ScreenGui)
 round(FloatBtn, 25); stroke(FloatBtn, Theme.Bg, 2)
 
--- Janela Principal
-local MainFrame = new("Frame", {
-    Size = pSize, 
-    AnchorPoint = Vector2.new(0.5, 0.5), 
-    Position = UDim2.new(0.5, 0, 0.5, 0), 
-    BackgroundColor3 = Theme.Bg, 
-    BorderSizePixel = 0, 
-    Visible = false, 
-    ClipsDescendants = true,
-    ZIndex = 999998
-}, ScreenGui)
+local MainFrame = new("Frame", {Size = pSize, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundColor3 = Theme.Bg, BorderSizePixel = 0, Visible = false, ClipsDescendants = true}, ScreenGui)
 round(MainFrame, 12); stroke(MainFrame, Theme.Pink, 1.5)
 
 local TopBar = new("Frame", {Size = UDim2.new(1, 0, 0, 45), BackgroundColor3 = Theme.TopBar, BorderSizePixel = 0}, MainFrame)
 round(TopBar, 12)
 new("Frame", {Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Theme.Pink, BorderSizePixel = 0}, TopBar)
-new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v19", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
+new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v22", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
 
 local CloseBtn = new("TextButton", {Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(1, -38, 0.5, -14), BackgroundColor3 = Theme.Bg, Text = "✕", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false}, TopBar)
 round(CloseBtn, 6)
 CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false; FloatBtn.Visible = true end)
-FloatBtn.MouseButton1Click:Connect(function() 
-    FloatBtn.Visible = false
-    MainFrame.Visible = true
-    tween(MainFrame, {Size = pSize})
-end)
+FloatBtn.MouseButton1Click:Connect(function() FloatBtn.Visible = false; MainFrame.Visible = true; tween(MainFrame, {Size = pSize}) end)
 
 -- Arrastar
 local dragging, dragStart, startPos
@@ -166,58 +151,7 @@ local function makeSearch(parent, placeholder, onChange)
 end
 
 -- ============================================
--- LOGIN ADM
--- ============================================
-local pageAdmin = makePage("admin", "🔐 ADM", 6)
-local loginFrame = new("Frame", {Size = UDim2.new(1, -6, 0, 180), BackgroundTransparency = 1}, pageAdmin)
-local contentFrame = new("Frame", {Size = UDim2.new(1, -6, 0, 0), BackgroundTransparency = 1, Visible = false}, pageAdmin)
-new("UIListLayout", {Padding = UDim.new(0, 6)}, contentFrame)
-
-makeLabel(loginFrame, "Digite a senha de Administrador:", Theme.TextGray, 30)
-local passBox = new("TextBox", {Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 35), BackgroundColor3 = Theme.Row, PlaceholderText = "Senha...", PlaceholderColor3 = Theme.TextGray, Text = "", TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 14, ClearTextOnFocus = true, BorderSizePixel = 0}, loginFrame)
-round(passBox, 8); stroke(passBox, Theme.Stroke)
-
-local loginBtn = new("TextButton", {Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 85), BackgroundColor3 = Theme.Pink, Text = "Entrar", TextColor3 = Theme.Bg, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false}, loginFrame)
-round(loginBtn, 8)
-
-loginBtn.MouseButton1Click:Connect(function()
-    if passBox.Text == ADMIN_PASSWORD then
-        loginFrame.Visible = false; contentFrame.Visible = true
-        notify("✅ Login ADM feito!")
-    else notify("❌ Senha incorreta!") end
-end)
-
-local function copyToClipboard(text)
-    if setclipboard then setclipboard(text); notify("📋 Copiado!") 
-    else notify("⚠️ Executor sem suporte."); print("[ADM] Texto:\n" .. text) end
-end
-
-makeLabel(contentFrame, "— Extrator de IDs —", Theme.Green)
-
-makeButton(contentFrame, "🔍 Escanear Workspace (Leve)", function()
-    notify("⏳ Escaneando...")
-    task.spawn(function()
-        local parts, tools, anims = {}, {}, {}
-        local count = 0
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            count += 1
-            if obj:IsA("BasePart") then table.insert(parts, obj.Name)
-            elseif obj:IsA("Tool") then table.insert(tools, obj.Name)
-            elseif obj:IsA("Animation") then table.insert(anims, obj.Name .. " (" .. obj.AnimationId .. ")") end
-            if count % 1000 == 0 then task.wait(0.1) end
-        end
-        makeButton(contentFrame, "📋 Copiar " .. #parts .. " Parts", function() copyToClipboard(table.concat(parts, "\n")) end)
-        makeButton(contentFrame, "📋 Copiar " .. #tools .. " Tools", function() copyToClipboard(table.concat(tools, "\n")) end)
-        makeButton(contentFrame, "📋 Copiar " .. #anims .. " Anims", function() copyToClipboard(table.concat(anims, "\n")) end)
-        notify(("✅ %d Parts, %d Tools, %d Anims"):format(#parts, #tools, #anims))
-    end)
-end)
-
-makeButton(contentFrame, "📋 Copiar Place ID", function() copyToClipboard(tostring(game.PlaceId)) end)
-makeButton(contentFrame, "📋 Copiar Job ID", function() copyToClipboard(tostring(game.JobId)) end)
-
--- ============================================
--- STALKER E INVISIBILIDADE
+-- LOGICA DE STALKER E INVISIBILIDADE
 -- ============================================
 local currentTarget = nil
 local isStalking = false
@@ -226,12 +160,7 @@ local alignPos, attachPart
 
 local function stopStalk()
     isStalking = false
-    if alignPos then 
-        pcall(function() alignPos.Enabled = false; alignPos.MaxForce = 0 end)
-        task.wait(0.05)
-        pcall(function() alignPos:Destroy() end)
-        alignPos = nil 
-    end
+    if alignPos then pcall(function() alignPos.Enabled = false; alignPos.MaxForce = 0 end); task.wait(0.05); pcall(function() alignPos:Destroy() end); alignPos = nil end
     if attachPart then pcall(function() attachPart:Destroy() end); attachPart = nil end
 end
 
@@ -262,6 +191,126 @@ local function setInvisible(state)
         end
     end)
 end
+
+-- ============================================
+-- ABA 4: FARM (MODO CARLÃO)
+-- ============================================
+local pageFarm = makePage("farm", "🍬 Farm", 4)
+local isFarming = false
+local farmingThread = nil
+local currentLocationIndex = 1
+
+-- 1. Configuração de tempo
+local candyWaitTime = 0.5
+local mapTpWaitTime = 1.0
+
+makeLabel(pageFarm, "— Tempos do Farm —", Theme.TextGray, 22)
+local timeFrame = new("Frame", {Size = UDim2.new(1, -6, 0, 34), BackgroundTransparency = 1}, pageFarm)
+new("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 4)}, timeFrame)
+
+local boxDoce = new("TextBox", {Size = UDim2.new(0.5, -2, 1, 0), BackgroundColor3 = Theme.Row, PlaceholderText = "Delay Doce (s)", PlaceholderColor3 = Theme.TextGray, Text = "0.5", TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 13, ClearTextOnFocus = false, BorderSizePixel = 0}, timeFrame)
+round(boxDoce, 8); stroke(boxDoce, Theme.Stroke)
+
+local boxMapa = new("TextBox", {Size = UDim2.new(0.5, -2, 1, 0), BackgroundColor3 = Theme.Row, PlaceholderText = "Delay Mapa (s)", PlaceholderColor3 = Theme.TextGray, Text = "1.0", TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 13, ClearTextOnFocus = false, BorderSizePixel = 0}, timeFrame)
+round(boxMapa, 8); stroke(boxMapa, Theme.Stroke)
+
+boxDoce.FocusLost:Connect(function() local n = tonumber(boxDoce.Text); if n then candyWaitTime = n end end)
+boxMapa.FocusLost:Connect(function() local n = tonumber(boxMapa.Text); if n then mapTpWaitTime = n end end)
+
+-- 2. Lógica de pegar doce
+local function getCandies()
+    local list = {}
+    local targets = {workspace:FindFirstChild("HalloweenCandiesLocal"), workspace:FindFirstChild("CandysTemplate")}
+    for _, parentObj in ipairs(targets) do
+        if parentObj then
+            for _, item in ipairs(parentObj:GetDescendants()) do
+                if item:IsA("BasePart") or item:IsA("Model") then table.insert(list, item) end
+            end
+        end
+    end
+    return list
+end
+
+local function collectCandy(candy)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char.HumanoidRootPart
+    local targetCFrame = candy:IsA("BasePart") and candy.CFrame or candy:GetPivot()
+
+    if targetCFrame then
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.CFrame = targetCFrame + Vector3.new(0, 0.2, 0)
+        
+        -- Tenta acionar o remote (se o jogo tiver)
+        local pickupRemote = nil
+        pcall(function() pickupRemote = ReplicatedStorage.Features.HalloweenCandy.Remotes.Pickup end)
+        if pickupRemote then
+            pcall(function()
+                local id = candy:GetAttribute("CandyId") or candy.Name
+                pickupRemote:InvokeServer(id)
+            end)
+        end
+        task.wait(candyWaitTime)
+    end
+end
+
+-- 3. Função de Farm Automático
+local function startFarmLoop()
+    farmingThread = task.spawn(function()
+        while isFarming and ScreenGui.Parent do
+            local candies = getCandies()
+            if #candies > 0 then
+                for _, candy in ipairs(candies) do
+                    if not isFarming then break end
+                    if candy and candy.Parent then collectCandy(candy) end
+                end
+            else
+                -- Se não tem doce, vai para os pontos do mapa
+                local targetPos = locations[currentLocationIndex]
+                local char = LocalPlayer.Character
+                if targetPos and char and char:FindFirstChild("HumanoidRootPart") then
+                    char.HumanoidRootPart.CFrame = CFrame.new(targetPos)
+                    currentLocationIndex = (currentLocationIndex % #locations) + 1
+                end
+                task.wait(mapTpWaitTime)
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+makeToggle(pageFarm, "🍬 Auto-Farm (Modo Carlão)", false, function(on)
+    isFarming = on
+    if on then
+        notify("🍬 Farm Automático Ativado")
+        startFarmLoop()
+    else
+        notify("⛔ Farm Desativado")
+        if farmingThread then pcall(function() task.cancel(farmingThread) end) end
+    end
+end)
+
+-- 4. Botão Manual
+makeLabel(pageFarm, "— Ações Rápidas —", Theme.TextGray, 22)
+makeButton(pageFarm, "🎯 Pegar Doce Mais Próximo (Manual)", function()
+    local candies = getCandies()
+    if #candies == 0 then return notify("⚠️ Nenhum doce no mapa.") end
+    
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local closest, dist = nil, math.huge
+    for _, c in ipairs(candies) do
+        local pos = c:IsA("BasePart") and c.Position or c:GetPivot().Position
+        local d = (pos - hrp.Position).Magnitude
+        if d < dist then dist = d; closest = c end
+    end
+    
+    if closest then
+        collectCandy(closest)
+        notify("📦 Doce coletado manualmente!")
+    end
+end)
 
 -- ============================================
 -- ABA 1: JOGADORES
@@ -331,46 +380,6 @@ makeToggle(pageUtil, "🔄 Anti-AFK", false, function(on)
 end)
 
 -- ============================================
--- ABA 4: FARM
--- ============================================
-local pageFarm = makePage("farm", "🍬 Farm", 4)
-local isFarming = false
-local farmConn = nil
-
-local function doCandyFarm()
-    if not isFarming then return end
-    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local candies = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name:lower():find("candy", 1, true) and (obj:IsA("BasePart") or obj:IsA("Model")) then table.insert(candies, obj) end
-    end
-    if #candies > 0 then
-        local closest, dist = nil, math.huge
-        for _, c in ipairs(candies) do
-            local pos = c:IsA("Model") and (c.PrimaryPart or c:FindFirstChildWhichIsA("BasePart")).Position or c.Position
-            if pos then local d = (pos - hrp.Position).Magnitude; if d < dist then dist = d; closest = pos end end
-        end
-        if closest then hrp.CFrame = CFrame.new(closest + Vector3.new(0, 3, 0)) end
-    end
-end
-
-workspace.DescendantAdded:Connect(function(obj)
-    if isFarming and obj.Name:lower():find("candy", 1, true) then task.wait(0.1); doCandyFarm() end
-end)
-
-makeToggle(pageFarm, "🍬 Auto-Farmar Doces", false, function(on)
-    isFarming = on
-    if on then
-        notify("🍬 Auto-Farm ATIVADO")
-        farmConn = RunService.Heartbeat:Connect(function() if isFarming then doCandyFarm() end end)
-    else
-        notify("⛔ Auto-Farm DESATIVADO")
-        if farmConn then farmConn:Disconnect(); farmConn = nil end
-    end
-end)
-
--- ============================================
 -- ABA 5: INFO
 -- ============================================
 local pageInfo = makePage("info", "🩺 Info", 5)
@@ -396,18 +405,36 @@ task.spawn(function()
     end
 end)
 
-task.spawn(function()
-    while ScreenGui.Parent do
-        if currentTarget then
-            targetDisplay.Text = "👤 @" .. currentTarget.Name
-            targetDisplay.TextColor3 = Theme.Pink
-        else
-            targetDisplay.Text = "Nenhum alvo"
-            targetDisplay.TextColor3 = Theme.TextGray
-        end
-        task.wait(1)
-    end
-end)
+-- ============================================
+-- ABA 6: LOGIN ADM
+-- ============================================
+local pageAdmin = makePage("admin", "🔐 ADM", 6)
+local loginFrame = new("Frame", {Size = UDim2.new(1, -6, 0, 220), BackgroundTransparency = 1}, pageAdmin)
+local contentFrame = new("Frame", {Size = UDim2.new(1, -6, 0, 0), BackgroundTransparency = 1, Visible = false}, pageAdmin)
+new("UIListLayout", {Padding = UDim.new(0, 6)}, contentFrame)
 
-selectTab("players")
-print("[Painel] v19 - Tela de Visibilidade Forçada Carregada! 🌸")
+makeLabel(loginFrame, "Senha: admin123", Theme.Green, 30)
+local passBox = new("TextBox", {Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 45), BackgroundColor3 = Theme.Row, PlaceholderText = "Digite a senha...", PlaceholderColor3 = Theme.TextGray, Text = "", TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 14, ClearTextOnFocus = true, BorderSizePixel = 0}, loginFrame)
+round(passBox, 8); stroke(passBox, Theme.Stroke)
+
+local loginBtn = new("TextButton", {Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 95), BackgroundColor3 = Theme.Pink, Text = "Entrar", TextColor3 = Theme.Bg, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false}, loginFrame)
+round(loginBtn, 8)
+
+local autoLoginBtn = new("TextButton", {Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 145), BackgroundColor3 = Theme.Green, Text = "⚡ Entrar Automaticamente", TextColor3 = Theme.Bg, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false}, loginFrame)
+round(autoLoginBtn, 8)
+
+local function doLogin()
+    loginFrame.Visible = false; contentFrame.Visible = true
+    notify("✅ Login ADM feito!")
+end
+loginBtn.MouseButton1Click:Connect(function()
+    if passBox.Text == ADMIN_PASSWORD then doLogin() else notify("❌ Senha incorreta! Use: admin123") end
+end)
+autoLoginBtn.MouseButton1Click:Connect(doLogin)
+
+local function copyToClipboard(text)
+    if setclipboard then setclipboard(text); notify("📋 Copiado!") else notify("⚠️ Executor sem suporte."); print("[ADM] Texto:\n" .. text) end
+end
+makeLabel(contentFrame, "— Extrator de IDs —", Theme.Green)
+
+makeButton(contentFrame
