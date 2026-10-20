@@ -1,5 +1,5 @@
 -- ============================================
--- PAINEL v28 - Fly / Explorer / Spy / Código / Diagnóstico / Log
+-- PAINEL v29 - Fly / Explorer / Spy / Código / Diagnóstico / Log / Lucky Block
 -- ============================================
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -54,7 +54,7 @@ round(MainFrame, 12); stroke(MainFrame, Theme.Pink, 1.5)
 local TopBar = new("Frame", {Size = UDim2.new(1, 0, 0, 45), BackgroundColor3 = Theme.TopBar, BorderSizePixel = 0}, MainFrame)
 round(TopBar, 12)
 new("Frame", {Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Theme.Pink, BorderSizePixel = 0}, TopBar)
-new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v28", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
+new("TextLabel", {Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "🌸 Painel v29", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left}, TopBar)
 
 local CloseBtn = new("TextButton", {Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(1, -38, 0.5, -14), BackgroundColor3 = Theme.Bg, Text = "✕", TextColor3 = Theme.Pink, Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, AutoButtonColor = false}, TopBar)
 round(CloseBtn, 6)
@@ -889,14 +889,135 @@ end)
 track(LogService.MessageOut:Connect(function(msg, t) pushLog(msg, t) end))
 
 -- ============================================
+-- ABA 13: LUCKY BLOCK (detecta spawn + TP exato)
+-- ============================================
+local pageLucky = makePage("lucky", "🍀 Lucky", 13)
+local luckyAuto, luckyExact = false, false
+local luckyName = "lucky"      -- trecho do nome (minúsculo)
+local luckyTimeout = 10        -- segundos esperando ela carregar por completo
+local luckySeen = setmetatable({}, {__mode = "k"})
+local luckyRemotes = setmetatable({}, {__mode = "k"})
+local lastLucky
+local luckyStatus, luckyList
+
+local function luckyTP(pos, name)
+    local hrp = getHRP()
+    if not hrp then return notify("⚠️ Personagem não encontrado") end
+    local off = luckyExact and Vector3.zero or Vector3.new(0, 3, 0)
+    hrp.CFrame = CFrame.new(pos + off)
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    notify("🍀 TP: " .. tostring(name))
+end
+
+local function luckyRecord(name, pos, inst)
+    lastLucky = {name = name, pos = pos, inst = inst}
+    local coords = string.format("%.1f, %.1f, %.1f", pos.X, pos.Y, pos.Z)
+    luckyStatus.Text = "✅ " .. os.date("%H:%M:%S") .. " " .. name .. " @ " .. coords
+    luckyStatus.TextColor3 = Theme.Green
+    makeRow(luckyList, os.date("%H:%M:%S") .. " " .. name .. "\n" .. coords, Theme.Text, {
+        {"📍", function() luckyTP(pos, name) end},
+        {"📋", function() clip(string.format("Vector3.new(%.2f, %.2f, %.2f)", pos.X, pos.Y, pos.Z)) end},
+    }, 48)
+    local kids = luckyList:GetChildren()
+    if #kids > 21 then for _, c in ipairs(kids) do if c:IsA("Frame") then c:Destroy(); break end end end
+end
+
+-- espera a block terminar de carregar e a posição estabilizar (evita TP em 0,0,0)
+local function luckyResolve(o)
+    local t0, last, stable = os.clock(), nil, 0
+    while os.clock() - t0 < luckyTimeout do
+        if not o.Parent then return nil end
+        local ready = o:IsA("BasePart") or o:FindFirstChildWhichIsA("BasePart", true)
+        local pos = ready and getPos(o)
+        if pos and pos.Magnitude > 1 then
+            if last and (pos - last).Magnitude < 0.05 then stable += 1 else stable = 0 end
+            last = pos
+            if stable >= 3 then return pos end
+        end
+        task.wait(0.1)
+    end
+    return last
+end
+
+local function luckyMatch(o)
+    if not (o:IsA("Model") or o:IsA("BasePart")) then return false end
+    if not o.Name:lower():find(luckyName, 1, true) then return false end
+    -- ignora partes internas de um model que já bate com o nome
+    if o.Parent and o.Parent ~= workspace and o.Parent:IsA("Model") and o.Parent.Name:lower():find(luckyName, 1, true) then return false end
+    return true
+end
+
+local function luckyHandle(o)
+    if luckySeen[o] then return end
+    luckySeen[o] = true
+    luckyStatus.Text = "⏳ Detectada: " .. o.Name .. " (carregando...)"
+    luckyStatus.TextColor3 = Theme.Yellow
+    local pos = luckyResolve(o)
+    if not pos then luckyStatus.Text = "❌ Sumiu antes de carregar"; luckyStatus.TextColor3 = Theme.Red; return end
+    luckyRecord(o.Name, pos, o)
+    if luckyAuto then luckyTP(pos, o.Name) end
+end
+
+-- Detecção por RemoteEvent (funciona com StreamingEnabled: o server manda a posição)
+local function luckyHookRemote(r)
+    if not r:IsA("RemoteEvent") or luckyRemotes[r] then return end
+    if not r.Name:lower():find(luckyName, 1, true) then return end
+    luckyRemotes[r] = true
+    track(r.OnClientEvent:Connect(function(...)
+        for _, v in ipairs({...}) do
+            local pos
+            if typeof(v) == "Vector3" then pos = v
+            elseif typeof(v) == "CFrame" then pos = v.Position
+            elseif typeof(v) == "Instance" then task.spawn(luckyHandle, v) end
+            if pos then
+                luckyRecord("Remote: " .. r.Name, pos, nil)
+                if luckyAuto then luckyTP(pos, r.Name) end
+            end
+        end
+    end))
+end
+
+track(workspace.DescendantAdded:Connect(function(o)
+    if luckyMatch(o) then task.spawn(luckyHandle, o) end
+end))
+track(game.DescendantAdded:Connect(function(o) pcall(luckyHookRemote, o) end))
+
+local function luckyScan()
+    luckySeen = setmetatable({}, {__mode = "k"})
+    local n = 0
+    for _, o in ipairs(game:GetDescendants()) do
+        pcall(luckyHookRemote, o)
+        if o:IsDescendantOf(workspace) and luckyMatch(o) then n += 1; task.spawn(luckyHandle, o) end
+    end
+    notify("🍀 " .. n .. " lucky block(s) no mapa")
+end
+
+makeLabel(pageLucky, "— Lucky Block —")
+makeToggle(pageLucky, "🍀 Auto-TP quando spawnar", false, function(on) luckyAuto = on; notify(on and "🍀 Auto-TP ligado" or "⛔ Auto-TP desligado") end)
+makeToggle(pageLucky, "🎯 TP exato (sem offset de altura)", false, function(on) luckyExact = on end)
+makeSearch(pageLucky, "Nome da lucky block (padrão: lucky)", function(t)
+    luckyName = (t == "" and "lucky") or t:lower()
+end)
+makeButton(pageLucky, "🔍 Escanear agora", luckyScan)
+makeButton(pageLucky, "📍 TP na última encontrada", function()
+    if lastLucky and (not lastLucky.inst or lastLucky.inst.Parent) then luckyTP(lastLucky.pos, lastLucky.name)
+    elseif lastLucky then luckyTP(lastLucky.pos, lastLucky.name .. " (posição antiga)")
+    else notify("⚠️ Nenhuma encontrada ainda") end
+end)
+luckyStatus = makeLabel(pageLucky, "Aguardando spawn...", Theme.TextGray, 36)
+makeLabel(pageLucky, "— Histórico (📍 TP | 📋 copiar posição) —", Theme.Green)
+luckyList = makeList(pageLucky)
+task.spawn(luckyScan)
+
+-- ============================================
 -- LIMPEZA
 -- ============================================
 env.PinkPanelCleanup = function()
     stopFly(); stopStalk()
-    isFarming = false; isInvisibleServer = false; spyOut = false
+    isFarming = false; isInvisibleServer = false; spyOut = false; luckyAuto = false
     setIncoming(false)
     for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
 end
 
 selectTab("players")
-print("[Painel] v28 carregado! 🌸")
+print("[Painel] v29 carregado! 🌸")
