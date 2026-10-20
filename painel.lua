@@ -899,6 +899,10 @@ local luckySeen = setmetatable({}, {__mode = "k"})
 local luckyRemotes = setmetatable({}, {__mode = "k"})
 local lastLucky
 local luckyStatus, luckyList
+local luckyCollect                 -- definida mais abaixo (coleta tipo farm de candy)
+local luckyCollectOn, luckyFarm = false, false
+local luckyRemotePath = ""         -- ex: "Features.LuckyBlock.Remotes.Pickup" (vazio = auto-detectar)
+local luckyFarmThread
 
 local function luckyTP(pos, name)
     local hrp = getHRP()
@@ -955,7 +959,10 @@ local function luckyHandle(o)
     local pos = luckyResolve(o)
     if not pos then luckyStatus.Text = "❌ Sumiu antes de carregar"; luckyStatus.TextColor3 = Theme.Red; return end
     luckyRecord(o.Name, pos, o)
-    if luckyAuto then luckyTP(pos, o.Name) end
+    if luckyAuto then
+        luckyTP(pos, o.Name)
+        if luckyCollectOn then task.wait(0.15); luckyCollect(o) end
+    end
 end
 
 -- Detecção por RemoteEvent (funciona com StreamingEnabled: o server manda a posição)
@@ -1007,6 +1014,90 @@ end)
 luckyStatus = makeLabel(pageLucky, "Aguardando spawn...", Theme.TextGray, 36)
 makeLabel(pageLucky, "— Histórico (📍 TP | 📋 copiar posição) —", Theme.Green)
 luckyList = makeList(pageLucky)
+
+-- ---------- COLETA (mesmo esquema do farm de candy) ----------
+local function findLuckyRemote()
+    if luckyRemotePath ~= "" then
+        local cur = ReplicatedStorage
+        local p = luckyRemotePath:gsub("^ReplicatedStorage%.", "")
+        for part in p:gmatch("[^%.]+") do cur = cur and cur:FindFirstChild(part) end
+        if cur and (cur:IsA("RemoteEvent") or cur:IsA("RemoteFunction")) then return cur end
+    end
+    for _, o in ipairs(ReplicatedStorage:GetDescendants()) do
+        if o:IsA("RemoteEvent") or o:IsA("RemoteFunction") then
+            local p = o:GetFullName():lower()
+            if p:find("lucky", 1, true) and (p:find("pickup", 1, true) or p:find("collect", 1, true) or p:find("claim", 1, true) or p:find("open", 1, true)) then
+                return o
+            end
+        end
+    end
+end
+
+luckyCollect = function(o)
+    if not o then return end
+    -- 1) remote de coleta do jogo, com o ID da própria block
+    local r = findLuckyRemote()
+    if r then
+        local id = o.Name
+        for k, v in pairs(o:GetAttributes()) do
+            if k:lower():find("id", 1, true) then id = v; break end
+        end
+        pcall(function()
+            if r:IsA("RemoteFunction") then r:InvokeServer(id) else r:FireServer(id) end
+        end)
+    end
+    -- 2) fallback: ProximityPrompt / toque, caso a coleta seja por interação
+    for _, d in ipairs(o:GetDescendants()) do
+        if d:IsA("ProximityPrompt") and fireproximityprompt then pcall(fireproximityprompt, d) end
+    end
+    local hrp = getHRP()
+    local part = o:IsA("BasePart") and o or o:FindFirstChildWhichIsA("BasePart", true)
+    if hrp and part and firetouchinterest then
+        pcall(function() firetouchinterest(hrp, part, 0); firetouchinterest(hrp, part, 1) end)
+    end
+end
+
+local function luckyFarmLoop()
+    luckyFarmThread = task.spawn(function()
+        while luckyFarm and ScreenGui.Parent do
+            local did = false
+            for _, o in ipairs(workspace:GetDescendants()) do
+                if not luckyFarm then break end
+                if luckyMatch(o) and o.Parent then
+                    local pos = getPos(o)
+                    if pos and pos.Magnitude > 1 then
+                        did = true
+                        luckyTP(pos, o.Name)
+                        task.wait(0.15)
+                        luckyCollect(o)
+                        task.wait(0.3)
+                    end
+                end
+            end
+            task.wait(did and 0.2 or 1)
+        end
+    end)
+end
+
+makeLabel(pageLucky, "— Coleta (igual ao Farm de Candy) —", Theme.Green)
+makeToggle(pageLucky, "✋ Coletar ao teleportar (Auto-TP)", false, function(on) luckyCollectOn = on end)
+makeToggle(pageLucky, "🔁 Auto-Farm Lucky (loop no mapa todo)", false, function(on)
+    luckyFarm = on
+    if on then notify("🍀 Auto-Farm Lucky ligado"); luckyFarmLoop()
+    else notify("⛔ Auto-Farm Lucky desligado"); if luckyFarmThread then pcall(task.cancel, luckyFarmThread) end end
+end)
+makeSearch(pageLucky, "Remote de coleta (vazio = auto). Ex: Features.X.Remotes.Pickup", function(t)
+    luckyRemotePath = t:gsub("%s", "")
+end)
+makeButton(pageLucky, "🔎 Qual remote foi achado?", function()
+    local r = findLuckyRemote()
+    if r then notify("🍀 " .. r:GetFullName()); clip(r:GetFullName())
+    else notify("⚠️ Nenhum remote de coleta achado") end
+end)
+makeButton(pageLucky, "✋ Coletar a última agora", function()
+    if lastLucky and lastLucky.inst and lastLucky.inst.Parent then luckyCollect(lastLucky.inst); notify("🍀 Coleta enviada")
+    else notify("⚠️ Nenhuma block ativa") end
+end)
 task.spawn(luckyScan)
 
 -- ============================================
@@ -1014,7 +1105,8 @@ task.spawn(luckyScan)
 -- ============================================
 env.PinkPanelCleanup = function()
     stopFly(); stopStalk()
-    isFarming = false; isInvisibleServer = false; spyOut = false; luckyAuto = false
+    isFarming = false; isInvisibleServer = false; spyOut = false; luckyAuto = false; luckyFarm = false; luckyCollectOn = false
+    if luckyFarmThread then pcall(task.cancel, luckyFarmThread) end
     setIncoming(false)
     for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
 end
