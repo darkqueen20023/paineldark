@@ -899,7 +899,7 @@ local luckySeen = setmetatable({}, {__mode = "k"})
 local luckyRemotes = setmetatable({}, {__mode = "k"})
 local lastLucky
 local luckyStatus, luckyList
-local luckyCollect                 -- definida mais abaixo (coleta tipo farm de candy)
+local luckyCollect, luckyPress    -- definidas mais abaixo (coleta tipo farm de candy / apertar E)
 local luckyCollectOn, luckyFarm = false, false
 local luckyRemotePath = ""         -- ex: "Features.LuckyBlock.Remotes.Pickup" (vazio = auto-detectar)
 local luckyFarmThread
@@ -1095,8 +1095,127 @@ makeButton(pageLucky, "🔎 Qual remote foi achado?", function()
     else notify("⚠️ Nenhum remote de coleta achado") end
 end)
 makeButton(pageLucky, "✋ Coletar a última agora", function()
-    if lastLucky and lastLucky.inst and lastLucky.inst.Parent then luckyCollect(lastLucky.inst); notify("🍀 Coleta enviada")
+    if lastLucky and lastLucky.prompt and lastLucky.prompt.Parent then task.spawn(function() luckyPress(lastLucky.prompt) end); notify("🍀 E enviado")
+    elseif lastLucky and lastLucky.inst and lastLucky.inst.Parent then luckyCollect(lastLucky.inst); notify("🍀 Coleta enviada")
     else notify("⚠️ Nenhuma block ativa") end
+end)
+-- ---------- EVENTO POR CHAT + PROMPT "APERTE E" ----------
+local luckyChatOn = true           -- liga/desliga o modo chat
+local luckyChatKey = "lucky"       -- palavra que o chat do evento contém (minúsculo)
+local luckyChatStamp = 0           -- quando a última mensagem do evento chegou
+local luckyWindow = 30             -- segundos de "janela" depois do aviso no chat
+
+local function promptPos(p)
+    local par = p.Parent
+    if par and par:IsA("Attachment") then return par.WorldPosition end
+    return getPos(p)
+end
+
+local function luckyPromptMatch(p)
+    local n = luckyName
+    if p.Parent and p.Parent.Name:lower():find(n, 1, true) then return true end
+    local m = p:FindFirstAncestorWhichIsA("Model")
+    if m and m.Name:lower():find(n, 1, true) then return true end
+    if (p.ActionText or ""):lower():find(n, 1, true) or (p.ObjectText or ""):lower():find(n, 1, true) then return true end
+    return false
+end
+
+-- aperta "E" de verdade: segura pelo tempo do prompt e, se ainda existir, dispara de novo
+luckyPress = function(p)
+    pcall(function()
+        p:InputHoldBegin()
+        task.wait((p.HoldDuration or 0) + 0.15)
+        p:InputHoldEnd()
+    end)
+    task.wait(0.4)
+    if p.Parent and fireproximityprompt then pcall(fireproximityprompt, p) end
+end
+
+local function luckyGrab(p)
+    if luckySeen[p] then return end
+    luckySeen[p] = true
+    luckyStatus.Text = "⏳ Prompt detectado, aguardando posição..."
+    luckyStatus.TextColor3 = Theme.Yellow
+    local t0, last, stable, pos = os.clock(), nil, 0, nil
+    while os.clock() - t0 < luckyTimeout do
+        if not p.Parent then return end
+        local cur = promptPos(p)
+        if cur and cur.Magnitude > 1 then
+            if last and (cur - last).Magnitude < 0.05 then stable += 1 else stable = 0 end
+            last = cur
+            if stable >= 3 then pos = cur; break end
+        end
+        task.wait(0.1)
+    end
+    pos = pos or last
+    if not pos then luckyStatus.Text = "❌ Prompt sem posição"; luckyStatus.TextColor3 = Theme.Red; return end
+    local nm = (p.Parent and p.Parent.Name) or "Prompt"
+    luckyRecord(nm, pos, p.Parent)
+    if lastLucky then lastLucky.prompt = p end
+    luckyTP(pos, nm)
+    task.wait(0.2)
+    luckyPress(p)
+    luckyStatus.Text = "🍀 Coleta enviada: " .. nm
+end
+
+-- varre o mapa atrás do prompt durante a janela do evento (caso a block já exista)
+local luckyHunting = false
+local function luckyHunt()
+    if luckyHunting then return end
+    luckyHunting = true
+    local t0 = os.clock()
+    while os.clock() - t0 < luckyWindow and luckyChatOn and ScreenGui.Parent do
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if d:IsA("ProximityPrompt") and not luckySeen[d] and luckyPromptMatch(d) then
+                task.spawn(luckyGrab, d)
+            end
+        end
+        task.wait(1)
+    end
+    luckyHunting = false
+end
+
+local function luckyOnChat(text)
+    if not luckyChatOn or type(text) ~= "string" then return end
+    if text:lower():find(luckyChatKey, 1, true) then
+        luckyChatStamp = os.clock()
+        luckyStatus.Text = "💬 Aviso do evento no chat! Procurando a block..."
+        luckyStatus.TextColor3 = Theme.Yellow
+        task.spawn(luckyHunt)
+    end
+end
+
+-- prompt novo apareceu: pega se o nome bate OU se surgiu logo depois do aviso no chat
+track(workspace.DescendantAdded:Connect(function(d)
+    if luckyChatOn and d:IsA("ProximityPrompt") then
+        local recent = os.clock() - luckyChatStamp < luckyWindow
+        if recent or luckyPromptMatch(d) then task.spawn(luckyGrab, d) end
+    end
+end))
+
+-- chat novo (TextChatService) e chat antigo (legacy)
+pcall(function()
+    local TCS = game:GetService("TextChatService")
+    track(TCS.MessageReceived:Connect(function(m) luckyOnChat(m.Text) end))
+end)
+pcall(function()
+    local ev = ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents", 3)
+    local done = ev and ev:FindFirstChild("OnMessageDoneFiltering")
+    if done then track(done.OnClientEvent:Connect(function(d) luckyOnChat(d and d.Message) end)) end
+end)
+
+makeLabel(pageLucky, "— Evento pelo chat (aperta E sozinho) —", Theme.Green)
+makeToggle(pageLucky, "💬 Chat → TP + apertar E", true, function(on)
+    luckyChatOn = on
+    notify(on and "💬 Modo chat ligado" or "⛔ Modo chat desligado")
+end)
+makeSearch(pageLucky, "Palavra do aviso no chat (padrão: lucky)", function(t)
+    luckyChatKey = (t == "" and "lucky") or t:lower()
+end)
+makeButton(pageLucky, "🧪 Simular aviso (procurar agora)", function()
+    luckyChatStamp = os.clock()
+    task.spawn(luckyHunt)
+    notify("🍀 Procurando prompt da lucky block...")
 end)
 task.spawn(luckyScan)
 
@@ -1105,7 +1224,7 @@ task.spawn(luckyScan)
 -- ============================================
 env.PinkPanelCleanup = function()
     stopFly(); stopStalk()
-    isFarming = false; isInvisibleServer = false; spyOut = false; luckyAuto = false; luckyFarm = false; luckyCollectOn = false
+    isFarming = false; isInvisibleServer = false; spyOut = false; luckyAuto = false; luckyFarm = false; luckyCollectOn = false; luckyChatOn = false
     if luckyFarmThread then pcall(task.cancel, luckyFarmThread) end
     setIncoming(false)
     for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
