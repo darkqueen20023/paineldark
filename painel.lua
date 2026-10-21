@@ -518,47 +518,217 @@ mkBtn(pFm,"🔄 Zerar contador",function() itemsCollected = 0; notify("🍬 Cont
 
 -- ========== ABA LUCKY ==========
 local pLk = mkPage("lucky","🍀 Lucky",6)
-local lkName = "lucky"
-local lkAuto = false
-local lastLk, lkLst
 
-local function lkTP(pos,nm)
-    local hrp = getHRP(); if not hrp then return end
-    hrp.CFrame = CFrame.new(pos+Vector3.new(0,3,0))
+-- pontos fixos
+local luckyPontos = {
+    ["lucky1"]  = CFrame.new(452.95, 20.04, 449.17),
+    ["lucky2"]  = CFrame.new(538.20, 16.96, -76.72),
+    ["lucky3"]  = CFrame.new(317.57, 15.40, -97.98),
+    ["lucky4"]  = CFrame.new(301.20, 9.71, -161.18),
+    ["lucky5"]  = CFrame.new(255.44, 5.16, -267.93),
+    ["lucky6"]  = CFrame.new(440.74, 31.55, 204.40),
+    ["lucky7"]  = CFrame.new(-87.13, 17.80, 426.76),
+    ["lucky8"]  = CFrame.new(-23.53, 16.07, 464.02),
+    ["lucky9"]  = CFrame.new(-127.79, 8.45, 168.73),
+    ["lucky10"] = CFrame.new(-183.76, 3.39, -260.52),
+    ["lucky11"] = CFrame.new(-768.27, 19.51, 61.02),
+    ["lucky12"] = CFrame.new(-735.07, 27.52, 400.73),
+    ["lucky13"] = CFrame.new(-568.23, 27.23, 440.60),
+    ["lucky14"] = CFrame.new(166.27, 15.96, 688.48),
+}
+
+-- nomes ordenados (lucky1..lucky14)
+local luckyOrder = {}
+for i = 1, 14 do luckyOrder[i] = "lucky"..i end
+
+-- estado
+local lkAuto = false
+local lkChatKey = "lucky"
+local lkVisited = {}      -- pontos já visitados nesta "onda" (reset quando nova mensagem chega)
+local lkAutoTh = nil
+local lkStatus = nil
+local lkChatStamp = 0     -- marca quando chegou a última mensagem do chat
+
+-- função: teleporta para um CFrame com offset pra não bugar
+local function lkTPTo(cf, nm)
+    local hrp = getHRP()
+    if not hrp then notify("⚠️ Personagem não encontrado"); return end
+    hrp.CFrame = cf + Vector3.new(0, 3, 0)
     hrp.AssemblyLinearVelocity = Vector3.zero
     notify("🍀 TP: "..tostring(nm))
 end
-local function lkRec(nm,pos)
-    lastLk = {name=nm,pos=pos}
-    local co = string.format("%.1f, %.1f, %.1f",pos.X,pos.Y,pos.Z)
-    local r = new("Frame",{Size=UDim2.new(1,0,0,48),BackgroundColor3=T.Row,BorderSizePixel=0},lkLst)
-    rnd(r,10); strk(r,T.Str,2)
-    new("TextLabel",{Size=UDim2.new(1,-80,1,-6),Position=UDim2.new(0,10,0,3),BackgroundTransparency=1,Text=nm.."\n"..co,TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true},r)
-    local tpb = new("TextButton",{Size=UDim2.new(0,32,1,-10),Position=UDim2.new(1,-44,0,5),BackgroundColor3=T.Grn,Text="📍",TextColor3=T.Bg,Font=Enum.Font.GothamBlack,TextSize=14,BorderSizePixel=0,AutoButtonColor=false},r)
-    rnd(tpb,8)
-    tpb.MouseButton1Click:Connect(function() lkTP(pos,nm) end)
-end
-mkLabel(pLk,"— Lucky Block —",T.Grn)
-mkTog(pLk,"🍀 Auto-TP ao spawnar",false,function(on) lkAuto=on end)
-mkBtn(pLk,"🔍 Escanear agora",function()
-    local n = 0
-    for _,o in ipairs(workspace:GetDescendants()) do
-        if (o:IsA("Model") or o:IsA("BasePart")) and o.Name:lower():find(lkName,1,true) then
-            local pos = o:IsA("BasePart") and o.Position or (o.GetPivot and o:GetPivot().Position)
-            if pos and pos.Magnitude>1 then n+=1; lkRec(o.Name,pos); if n>=20 then break end end
+
+-- função: encontra o ponto mais próximo ainda não visitado
+local function lkFindNearestUnvisited()
+    local hrp = getHRP()
+    if not hrp then return nil, nil end
+    local myPos = hrp.Position
+    local bestName, bestCF, bestDist = nil, nil, math.huge
+    for _, name in ipairs(luckyOrder) do
+        if not lkVisited[name] then
+            local cf = luckyPontos[name]
+            if cf then
+                local d = (cf.Position - myPos).Magnitude
+                if d < bestDist then
+                    bestDist = d
+                    bestName = name
+                    bestCF = cf
+                end
+            end
         end
     end
-    notify("🍀 "..n.." lucky encontradas")
-end)
-mkLabel(pLk,"— Histórico —",T.Grn)
-lkLst = mkList(pLk)
-track(workspace.DescendantAdded:Connect(function(o)
-    if lkAuto and (o:IsA("Model") or o:IsA("BasePart")) and o.Name:lower():find(lkName,1,true) then
-        task.wait(1)
-        local pos = o:IsA("BasePart") and o.Position or (o.GetPivot and o:GetPivot().Position)
-        if pos and pos.Magnitude>1 then lkRec(o.Name,pos); lkTP(pos,o.Name) end
+    return bestName, bestCF
+end
+
+-- AUTOMÁTICO: assim que chega mensagem no chat avisando lucky, ele vai a cada ponto não visitado
+local function lkStartAuto()
+    if lkAutoTh then pcall(task.cancel, lkAutoTh) end
+    lkAutoTh = task.spawn(function()
+        while lkAuto and SG.Parent do
+            -- se não tem mensagem recente, espera
+            if os.clock() - lkChatStamp > 30 then
+                if lkStatus then
+                    lkStatus.Text = "⏳ Aguardando aviso no chat (palavra: '"..lkChatKey.."')..."
+                    lkStatus.TextColor3 = T.Gray
+                end
+                task.wait(0.5)
+                continue
+            end
+
+            -- mensagem recente: vai para o próximo ponto ainda não visitado
+            local nm, cf = lkFindNearestUnvisited()
+            if nm and cf then
+                lkVisited[nm] = true
+                if lkStatus then
+                    lkStatus.Text = "🎯 Indo para: "..nm
+                    lkStatus.TextColor3 = T.Yel
+                end
+                lkTPTo(cf, nm)
+                task.wait(1.5)   -- espera chegar (o TP é instantâneo, mas dá tempo pro chão carregar)
+            else
+                -- visitou todos os pontos desta onda; espera nova mensagem
+                if lkStatus then
+                    lkStatus.Text = "✅ Todos os pontos visitados. Aguardando novo aviso..."
+                    lkStatus.TextColor3 = T.Grn
+                end
+                task.wait(1)
+            end
+        end
+    end)
+end
+
+-- Monitor de chat (TextChatService moderno + legacy)
+local function lkOnChatMessage(text)
+    if not lkAuto then return end
+    if type(text) ~= "string" then return end
+    if text:lower():find(lkChatKey, 1, true) then
+        lkChatStamp = os.clock()
+        lkVisited = {}  -- reseta a onda
+        if lkStatus then
+            lkStatus.Text = "💬 Aviso detectado! Indo à primeira lucky..."
+            lkStatus.TextColor3 = T.Yel
+        end
     end
-end))
+end
+
+pcall(function()
+    local TextChatService = game:GetService("TextChatService")
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        TextChatService.MessageReceived:Connect(function(msg)
+            lkOnChatMessage(msg.Text)
+        end)
+    end
+end)
+pcall(function()
+    local legacy = RS:FindFirstChild("DefaultChatSystemChatEvents")
+    if legacy then
+        local onMsg = legacy:FindFirstChild("OnMessageDoneFiltering")
+        if onMsg then
+            onMsg.OnClientEvent:Connect(function(data)
+                if data and data.Message then lkOnChatMessage(data.Message) end
+            end)
+        end
+    end
+end)
+
+-- UI: toggle automático + status
+mkLabel(pLk,"— Modo Automático —",T.Grn)
+mkTog(pLk,"💬 Auto-TP ao aviso no chat",false,function(on)
+    lkAuto = on
+    if on then
+        lkChatStamp = 0
+        lkVisited = {}
+        notify("🍀 Auto-TP ligado (palavra: '"..lkChatKey.."')")
+        lkStartAuto()
+    else
+        notify("⛔ Auto-TP desligado")
+        if lkAutoTh then pcall(task.cancel, lkAutoTh); lkAutoTh = nil end
+    end
+end)
+
+-- campo pra mudar a palavra-chave do chat
+local lkKeyBox = new("TextBox",{
+    Size = UDim2.new(1,-6,0,38),
+    BackgroundColor3 = T.Row,
+    PlaceholderText = "Palavra no chat (padrão: lucky)",
+    PlaceholderColor3 = T.Gray,
+    Text = "lucky",
+    TextColor3 = T.Tx,
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    ClearTextOnFocus = false,
+    BorderSizePixel = 0,
+}, pLk)
+rnd(lkKeyBox,12); strk(lkKeyBox,T.Str,2)
+lkKeyBox.FocusLost:Connect(function()
+    local t = lkKeyBox.Text
+    if t and t ~= "" then
+        lkChatKey = t:lower()
+        notify("💬 Palavra: '"..lkChatKey.."'")
+    else
+        lkKeyBox.Text = lkChatKey
+    end
+end)
+
+-- status
+lkStatus = new("TextLabel",{
+    Size = UDim2.new(1,-6,0,44),
+    BackgroundColor3 = T.Row,
+    Text = "Aguardando ativação...",
+    TextColor3 = T.Gray,
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    TextWrapped = true,
+    BorderSizePixel = 0,
+}, pLk)
+rnd(lkStatus,10); strk(lkStatus,T.Str,2)
+new("UIPadding",{PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8)},lkStatus)
+
+-- botão pra resetar a lista de visitados manualmente
+mkBtn(pLk,"🔄 Resetar visitados",function()
+    lkVisited = {}
+    if lkStatus then
+        lkStatus.Text = "🔄 Visitados resetados"
+        lkStatus.TextColor3 = T.Grn
+    end
+    notify("🔄 Lista de visitados resetada")
+end)
+
+-- ========== MODO MANUAL: TP direto pra cada lucky ==========
+mkLabel(pLk,"— Modo Manual (TP direto) —",T.Grn)
+local lkManualLst = mkList(pLk)
+
+for i = 1, 14 do
+    local nm = "lucky"..i
+    local cf = luckyPontos[nm]
+    if cf then
+        local co = string.format("%.1f, %.1f, %.1f", cf.X, cf.Y, cf.Z)
+        mkRow(lkManualLst, "🍀 "..nm.."\n"..co, T.Tx, {
+            {"📍", function() lkTPTo(cf, nm) end},
+            {"📋", function() clip(string.format('CFrame.new(%.2f, %.2f, %.2f)', cf.X, cf.Y, cf.Z)) end},
+        }, 50)
+    end
+end
 
 -- ========== ABA EXPLORER/SPY ==========
 local pEx = mkPage("explorer","🗺️ Explorer/Spy",7)
