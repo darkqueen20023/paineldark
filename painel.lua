@@ -1,5 +1,5 @@
 -- ============================================
--- PAINEL v31 — Cartoon / Seguro
+-- PAINEL v31 — Completo
 -- ============================================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,16 +28,15 @@ local Theme = {
 
 local conns = {}
 local function track(c) conns[#conns + 1] = c; return c end
-local function tween(obj, props) TweenService:Create(obj, TweenInfo.new(0.2), props):Play() end
-local function new(class, props, parent) local i = Instance.new(class); for k, v in pairs(props) do i[k] = v end; if parent then i.Parent = parent end; return i end
+local function tween(o, p) TweenService:Create(o, TweenInfo.new(0.2), p):Play() end
+local function new(c, p, par) local i = Instance.new(c); for k, v in pairs(p) do i[k] = v end; if par then i.Parent = par end; return i end
 local function round(p, r) return new("UICorner", {CornerRadius = UDim.new(0, r)}, p) end
 local function stroke(p, c, t) return new("UIStroke", {Color = c, Thickness = t or 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, p) end
 
 task.wait(1)
 
--- GUI (PlayerGui = seguro)
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local ScreenGui = new("ScreenGui", {Name = "PinkPanel", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 999999}, PlayerGui)
+-- GUI
+local ScreenGui = new("ScreenGui", {Name = "PinkPanel", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 999999}, LocalPlayer:WaitForChild("PlayerGui"))
 env.PinkPanelGui = ScreenGui
 
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -62,6 +61,7 @@ round(CloseBtn, 10); stroke(CloseBtn, Theme.Pink, 2)
 CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false; shadow.Visible = false; FloatBtn.Visible = true end)
 FloatBtn.MouseButton1Click:Connect(function() FloatBtn.Visible = false; MainFrame.Visible = true; shadow.Visible = true end)
 
+-- Arrastar
 local dragging, dragStart, startPos
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -77,6 +77,7 @@ track(UserInputService.InputChanged:Connect(function(input)
     end
 end))
 
+-- Notificações
 local function notify(text)
     local t = new("TextLabel", {Size = UDim2.new(0, 300, 0, 42), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 60), BackgroundColor3 = Theme.TopBar, Text = text, TextColor3 = Theme.Text, Font = Enum.Font.GothamBold, TextSize = 13, TextWrapped = true, ZIndex = 999999}, ScreenGui)
     round(t, 12); stroke(t, Theme.Pink, 2)
@@ -86,9 +87,10 @@ end
 
 local function clip(s)
     local f = setclipboard or toclipboard
-    if f then pcall(f, s); notify("📋 Copiado!") else notify("⚠️ Executor sem setclipboard") end
+    if f then pcall(f, s); notify("📋 Copiado!") else notify("⚠️ Sem setclipboard") end
 end
 
+-- Abas
 local TabBar = new("ScrollingFrame", {Size = UDim2.new(1, -20, 0, 42), Position = UDim2.new(0, 10, 0, 66), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = Theme.Pink, AutomaticCanvasSize = Enum.AutomaticSize.X, CanvasSize = UDim2.new(0, 0, 0, 0), ScrollingDirection = Enum.ScrollingDirection.X}, MainFrame)
 new("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center}, TabBar)
 local Body = new("Frame", {Size = UDim2.new(1, -20, 1, -120), Position = UDim2.new(0, 10, 0, 116), BackgroundTransparency = 1}, MainFrame)
@@ -168,7 +170,6 @@ local function makeTextView(parent, height)
     return tb
 end
 
--- Sub-menu
 local function makeSubMenu(parent, items)
     local bar = new("Frame", {Size = UDim2.new(1, -6, 0, 36), BackgroundColor3 = Theme.TopBar, BorderSizePixel = 0}, parent)
     round(bar, 10); stroke(bar, Theme.Stroke, 2)
@@ -194,47 +195,22 @@ local function makeSubMenu(parent, items)
     return contents
 end
 
--- HELPERS
+-- Helpers
 local function getHRP() return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") end
-
 local function getPos(o)
     if o:IsA("BasePart") then return o.Position end
     if o:IsA("Model") then local ok2, p = pcall(function() return o:GetPivot().Position end); if ok2 then return p end end
-    local a = o:FindFirstAncestorWhichIsA("BasePart")
-    if a then return a.Position end
+    local a = o:FindFirstAncestorWhichIsA("BasePart"); if a then return a.Position end
     return nil
 end
-
 local function tpTo(o)
     local hrp, pos = getHRP(), getPos(o)
     if hrp and pos then hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0)); notify("📍 TP: " .. o.Name)
-    else notify("⚠️ Esse item não tem posição") end
-end
-
-local idProps = {"MeshId", "TextureID", "TextureId", "AnimationId", "SoundId", "Texture", "Image"}
-local function getIds(o)
-    local out = {}
-    for _, p in ipairs(idProps) do
-        local ok2, v = pcall(function() return o[p] end)
-        if ok2 and type(v) == "string" and v ~= "" then out[#out + 1] = p .. "=" .. v end
-    end
-    return table.concat(out, " | ")
-end
-
-local function fullInfo(o)
-    local L = {}
-    L[#L + 1] = "Nome: " .. o.Name
-    L[#L + 1] = "Classe: " .. o.ClassName
-    L[#L + 1] = "Caminho: " .. o:GetFullName()
-    local pos = getPos(o)
-    if pos then L[#L + 1] = string.format("Pos: %.1f, %.1f, %.1f", pos.X, pos.Y, pos.Z) end
-    local ids = getIds(o)
-    if ids ~= "" then L[#L + 1] = "IDs: " .. ids end
-    return table.concat(L, "\n")
+    else notify("⚠️ Item sem posição") end
 end
 
 -- ============================================
--- ABA 1: PLAYERS
+-- ABA: PLAYERS
 -- ============================================
 local pagePlayers = makePage("players", "👥 Players", 1)
 local playerFilter = ""
@@ -271,12 +247,11 @@ track(Players.PlayerAdded:Connect(rebuildPlayers))
 track(Players.PlayerRemoving:Connect(function() task.wait(0.1); rebuildPlayers() end))
 
 -- ============================================
--- ABA 2: STALKER
+-- ABA: STALKER
 -- ============================================
 local pageStalker = makePage("stalker", "🕵️ Stalker", 2)
 makeLabel(pageStalker, "— Alvo Atual —")
 targetLabel = makeLabel(pageStalker, "Nenhum alvo", Theme.TextGray, 24)
-
 makeButton(pageStalker, "📍 Teleportar para o Alvo", function()
     if currentTarget and currentTarget.Character then
         local myHRP = getHRP()
@@ -286,7 +261,7 @@ makeButton(pageStalker, "📍 Teleportar para o Alvo", function()
 end)
 
 -- ============================================
--- ABA 3: UTIL (Anti-AFK + Fly)
+-- ABA: UTIL
 -- ============================================
 local pageUtil = makePage("util", "⚙️ Util", 3)
 makeToggle(pageUtil, "🔄 Anti-AFK", false, function(on)
@@ -301,7 +276,6 @@ end)
 
 local flying, flySpeed, flyUp, flyDown = false, 60, false, false
 local flyBV, flyBG, flyConn
-
 local function stopFly()
     flying = false
     if flyConn then flyConn:Disconnect(); flyConn = nil end
@@ -310,7 +284,6 @@ local function stopFly()
     local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
     if hum then hum.PlatformStand = false end
 end
-
 local function startFly()
     local hrp = getHRP()
     local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -340,14 +313,10 @@ local function startFly()
     end)
     notify("🕊️ Fly ligado")
 end
-
 track(LocalPlayer.CharacterAdded:Connect(function() if flying then task.wait(1); startFly() end end))
-
-makeLabel(pageUtil, "— Fly —")
 makeToggle(pageUtil, "🕊️ Fly (WASD + Espaço/Shift)", false, function(on)
     if on then startFly() else stopFly(); notify("⛔ Fly desligado") end
 end)
-
 local speedBox = new("TextBox", {Size = UDim2.new(1, -6, 0, 38), BackgroundColor3 = Theme.Row, PlaceholderText = "Velocidade do Fly (padrão 60)", PlaceholderColor3 = Theme.TextGray, Text = "", TextColor3 = Theme.Text, Font = Enum.Font.GothamBold, TextSize = 13, ClearTextOnFocus = false, BorderSizePixel = 0}, pageUtil)
 round(speedBox, 12); stroke(speedBox, Theme.Stroke, 2)
 speedBox.FocusLost:Connect(function()
@@ -356,15 +325,13 @@ speedBox.FocusLost:Connect(function()
 end)
 
 -- ============================================
--- ABA 4: TP (SALVAR POSIÇÃO)
+-- ABA: TP (SALVAR POSIÇÃO)
 -- ============================================
 local pageTP = makePage("positions", "📍 TP", 4)
 makeLabel(pageTP, "— Salvar e voltar —", Theme.Green)
-
 local savedPositions = {}
 local posNameBox = new("TextBox", {Size = UDim2.new(1, -6, 0, 40), BackgroundColor3 = Theme.Row, PlaceholderText = "Nome do ponto (ex: base, farm...)", PlaceholderColor3 = Theme.TextGray, Text = "", TextColor3 = Theme.Text, Font = Enum.Font.GothamBold, TextSize = 14, ClearTextOnFocus = false, BorderSizePixel = 0}, pageTP)
 round(posNameBox, 10); stroke(posNameBox, Theme.Stroke, 2)
-
 local posList = makeList(pageTP)
 
 local function renderPositions()
@@ -399,4 +366,35 @@ end)
 makeButton(pageTP, "📋 Exportar todos como script", function()
     if #savedPositions == 0 then return notify("⚠️ Nada salvo ainda") end
     local out = {}
-    for
+    for _, p in ipairs(savedPositions) do
+        out[#out + 1] = string.format('["%s"] = CFrame.new(%.2f, %.2f, %.2f);', p.name, p.cf.X, p.cf.Y, p.cf.Z)
+    end
+    clip("local pontos = {\n  " .. table.concat(out, "\n  ") .. "\n}")
+end)
+renderPositions()
+
+-- ============================================
+-- ABA: FARM (candy)
+-- ============================================
+local pageFarm = makePage("farm", "🍬 Farm", 5)
+local isFarming, farmingThread, candyWaitTime = false, nil, 0.2
+local function getAllCandies()
+    local list = {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name:lower():find("candy", 1, true) and (obj:IsA("BasePart") or obj:IsA("Model")) then table.insert(list, obj) end
+    end
+    return list
+end
+local function safeTP(pos)
+    local hrp = getHRP(); if not hrp then return end
+    local dist = (pos - hrp.Position).Magnitude
+    if dist > 50 then
+        local dir = (pos - hrp.Position).Unit
+        for i = 1, 3 do hrp.CFrame = hrp.CFrame + dir * (dist / 4); task.wait(0.1) end
+    end
+    hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
+    hrp.AssemblyLinearVelocity = Vector3.zero
+end
+local function startFarmLoop()
+    farmingThread = task.spawn(function()
+        while isFarming and Screen
