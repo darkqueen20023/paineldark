@@ -304,352 +304,188 @@ mkBtn(pTp,"📋 Exportar como script",function()
 end)
 renderP()
 
--- ========== ABA FARM ==========
+-- ========== ABA FARM (MÉTODO DO CARLÃO) ==========
 local pFm = mkPage("farm","🍬 Farm",5)
 local isFarm, farmTh = false, nil
+local itemsCollected = 0
+local itemWaitTime = 0.5
+local flySpeed = 350
+local currentTween = nil
 
-local function allCandy()
-    local l = {}
-    for _,o in ipairs(workspace:GetDescendants()) do
-        if o.Name:lower():find("candy",1,true) and (o:IsA("BasePart") or o:IsA("Model")) then l[#l+1]=o end
+local pickupRemote = nil
+pcall(function()
+    pickupRemote = RS.Features.HalloweenCandy.Remotes.Pickup
+end)
+
+local function getAllTargets()
+    local list = {}
+    local candyTargets = {
+        workspace:FindFirstChild("HalloweenCandiesLocal"),
+        workspace:FindFirstChild("CandysTemplate")
+    }
+    for _, parentObj in ipairs(candyTargets) do
+        if parentObj then
+            for _, item in ipairs(parentObj:GetDescendants()) do
+                if item:IsA("BasePart") or item:IsA("Model") then
+                    table.insert(list, {type = "candy", obj = item})
+                end
+            end
+        end
     end
-    return l
+    return list
 end
 
--- 🚀 DESLIZA até o doce: teleporta quase em cima + desliza os últimos studs
-local function slideTo(targetPos, opts)
-    opts = opts or {}
-    local hrp = getHRP()
-    if not hrp then return false end
+local function getCandyIdentifier(candy)
+    if not candy then return nil end
+    if candy:GetAttribute("CandyId") then return candy:GetAttribute("CandyId") end
+    if candy:FindFirstChild("CandyId") then return candy.CandyId.Value end
+    if candy:FindFirstChild("ID") then return candy.ID.Value end
+    return candy.Name
+end
 
-    local stopDist = opts.stopDist or 2.5
-    local stepTime = opts.stepTime or 0.03   -- MUITO rápido
-    local stepSize = opts.stepSize or 6      -- studs por tick
-    local maxTime  = opts.maxTime  or 4
-
-    local start = tick()
-    while tick() - start < maxTime do
-        hrp = getHRP()
-        if not hrp then return false end
-
-        local cur = hrp.Position
-        local delta = targetPos - cur
-        local flat = Vector3.new(delta.X, 0, delta.Z)
-        local dist = flat.Magnitude
-
-        -- cola no doce (mesma altura dele) quando perto
-        if dist <= stopDist then
-            hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 1.5, 0))
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            return true
-        end
-
-        -- se está MUITO longe, salta direto pra 10 studs de distância (não 200)
-        if dist > 60 then
-            local dir = flat.Unit
-            local near = targetPos - dir * 8 + Vector3.new(0, 2, 0)
-            hrp.CFrame = CFrame.new(near, near + dir)
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            task.wait(0.05)
-        else
-            -- desliza rápido na direção do doce (mantém altura do doce)
-            local dir = flat.Unit
-            local moveDist = math.min(stepSize, dist - stopDist)
-            local nextPos = cur + dir * moveDist
-            nextPos = Vector3.new(nextPos.X, targetPos.Y + 1.5, nextPos.Z)
-            hrp.CFrame = CFrame.new(nextPos, nextPos + dir)
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            task.wait(stepTime)
-        end
+local function isColectSuccessful(response)
+    if type(response) == "table" then
+        if response.ok == true then return true end
+        if response[1] and type(response[1]) == "table" and response[1].ok == true then return true end
+    elseif response == true then
+        return true
     end
     return false
 end
 
-mkTog(pFm,"🍬 Auto-Farm Candy (rápido)",false,function(on)
+-- MÉTODO DO CARLÃO: tween em 2 fases com hrp.Anchored
+local function smartFlyTo(targetCFrame, baseSpeed)
+    local char = LP.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char.HumanoidRootPart
+
+    local speed = baseSpeed or flySpeed
+    local totalDistance = (hrp.Position - targetCFrame.Position).Magnitude
+
+    if totalDistance > 40 then
+        local boostedSpeed = speed * 1.8
+        local direction = (targetCFrame.Position - hrp.Position).Unit
+        local stopPointPosition = targetCFrame.Position - (direction * 5)
+        local preTargetCFrame = CFrame.new(stopPointPosition, targetCFrame.Position)
+
+        if currentTween then currentTween:Cancel() end
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.Anchored = true
+
+        local preDistance = (hrp.Position - stopPointPosition).Magnitude
+        local duration1 = math.clamp(preDistance / boostedSpeed, 0.05, 3.0)
+
+        currentTween = Tween:Create(hrp, TweenInfo.new(duration1, Enum.EasingStyle.Linear), {CFrame = preTargetCFrame})
+        currentTween:Play()
+
+        local completed1 = false
+        local conn1 = currentTween.Completed:Connect(function() completed1 = true end)
+        local start1 = tick()
+        while not completed1 and isFarm do
+            if tick() - start1 > (duration1 + 0.2) then break end
+            task.wait(0.05)
+        end
+        if conn1 then conn1:Disconnect() end
+    end
+
+    if currentTween then currentTween:Cancel() end
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.Anchored = true
+
+    local finalDistance = (hrp.Position - targetCFrame.Position).Magnitude
+    local duration2 = math.clamp(finalDistance / speed, 0.05, 2.0)
+
+    currentTween = Tween:Create(hrp, TweenInfo.new(duration2, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    currentTween:Play()
+
+    local completed2 = false
+    local conn2 = currentTween.Completed:Connect(function() completed2 = true end)
+    local start2 = tick()
+    while not completed2 and isFarm do
+        if tick() - start2 > (duration2 + 0.2) then break end
+        task.wait(0.05)
+    end
+    if conn2 then conn2:Disconnect() end
+
+    hrp.Anchored = false
+end
+
+local function collectTarget(targetData)
+    local char = LP.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    local hrp = char.HumanoidRootPart
+    local item = targetData.obj
+    local targetCFrame
+
+    if item:IsA("BasePart") then
+        targetCFrame = item.CFrame
+    elseif item:IsA("Model") then
+        targetCFrame = item:GetPivot()
+    end
+
+    if targetCFrame then
+        -- offset lateral (do lado, não em cima)
+        local sideOffset = CFrame.new(1.8, 0.1, 0)
+        smartFlyTo(targetCFrame * sideOffset, flySpeed)
+
+        local collectedSuccess = false
+
+        local function triggerPickup()
+            if targetData.type == "candy" then
+                local candyId = getCandyIdentifier(item)
+                if pickupRemote and candyId then
+                    pcall(function()
+                        local res1 = pickupRemote:InvokeServer(candyId)
+                        if isColectSuccessful(res1) then
+                            collectedSuccess = true
+                        else
+                            local res2 = pickupRemote:InvokeServer(item)
+                            if isColectSuccessful(res2) then
+                                collectedSuccess = true
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+
+        triggerPickup()
+
+        local waitStart = tick()
+        while (tick() - waitStart < 0.5) and (item and item.Parent) and not collectedSuccess do
+            task.wait(0.05)
+        end
+
+        if item and item.Parent and not collectedSuccess then
+            local nudgeOffset = CFrame.new(-1.8, -0.2, 0)
+            smartFlyTo(targetCFrame * nudgeOffset, flySpeed)
+            triggerPickup()
+        end
+
+        task.wait(itemWaitTime)
+
+        if collectedSuccess or not (item and item.Parent) then
+            itemsCollected = itemsCollected + 1
+            notify("🍬 Coletados: " .. itemsCollected)
+        end
+    end
+end
+
+mkTog(pFm,"🍬 Auto-Farm Candy",false,function(on)
     isFarm = on
     if on then
         notify("🍬 Farm ligado")
         farmTh = task.spawn(function()
             while isFarm and SG.Parent do
-                local c = allCandy()
-                if #c > 0 then
-                    local t = c[1]
-                    if t and t.Parent then
-                        local pos = t:IsA("BasePart") and t.Position or (t.GetPivot and t:GetPivot().Position)
-                        if pos then
-                            slideTo(pos, {stopDist = 2.5, stepTime = 0.03, stepSize = 6})
-
-                            local r = nil
-                            pcall(function() r = RS.Features.HalloweenCandy.Remotes.Pickup end)
-                            if r then pcall(function() r:InvokeServer(t:GetAttribute("CandyId") or t.Name) end) end
-
-                            local hrp = getHRP()
-                            if hrp and firetouchinterest then
-                                local part = t:IsA("BasePart") and t or t:FindFirstChildWhichIsA("BasePart", true)
-                                if part then
-                                    pcall(function()
-                                        firetouchinterest(hrp, part, 0)
-                                        firetouchinterest(hrp, part, 1)
-                                    end)
-                                end
-                            end
-                            task.wait(0.15)
+                local targets = getAllTargets()
+                if #targets > 0 then
+                    for _, targetData in ipairs(targets) do
+                        if not isFarm then break end
+                        if targetData.obj and targetData.obj.Parent then
+                            collectTarget(targetData)
                         end
                     end
                 else
-                    task.wait(0.5)
+                    task.wait(1)
                 end
-                task.wait(0.05)
-            end
-        end)
-    else
-        notify("⛔ Farm desligado")
-        if farmTh then pcall(task.cancel, farmTh) end
-    end
-end)
-
--- ajustes rápidos
-mkLabel(pFm,"— Ajustes (deixe em branco p/ padrão) —",T.Grn)
-local distBox = new("TextBox",{Size=UDim2.new(1,-6,0,36),BackgroundColor3=T.Row,PlaceholderText="Distância do doce (padrão 2.5)",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,ClearTextOnFocus=false,BorderSizePixel=0},pFm)
-rnd(distBox,10); strk(distBox,T.Str,2)
-env.FarmDist = 2.5
-distBox.FocusLost:Connect(function()
-    local n = tonumber(distBox.Text)
-    if n then env.FarmDist = math.clamp(n, 1, 15); notify("🍬 Distância: "..env.FarmDist) end
-end)
-
-local spdBox = new("TextBox",{Size=UDim2.new(1,-6,0,36),BackgroundColor3=T.Row,PlaceholderText="Velocidade do passo (padrão 6)",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,ClearTextOnFocus=false,BorderSizePixel=0},pFm)
-rnd(spdBox,10); strk(spdBox,T.Str,2)
-env.FarmStep = 6
-spdBox.FocusLost:Connect(function()
-    local n = tonumber(spdBox.Text)
-    if n then env.FarmStep = math.clamp(n, 1, 30); notify("🍬 Passo: "..env.FarmStep) end
-end)
-
-local timeBox = new("TextBox",{Size=UDim2.new(1,-6,0,36),BackgroundColor3=T.Row,PlaceholderText="Delay entre passos (padrão 0.03s)",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,ClearTextOnFocus=false,BorderSizePixel=0},pFm)
-rnd(timeBox,10); strk(timeBox,T.Str,2)
-env.FarmStepTime = 0.03
-timeBox.FocusLost:Connect(function()
-    local n = tonumber(timeBox.Text)
-    if n then env.FarmStepTime = math.clamp(n, 0.01, 0.5); notify("🍬 Delay: "..env.FarmStepTime.."s") end
-end)
-
--- ========== ABA LUCKY ==========
-local pLk = mkPage("lucky","🍀 Lucky",6)
-local lkName = "lucky"
-local lkAuto = false
-local lastLk, lkLst
-
-local function lkTP(pos,nm)
-    local hrp = getHRP(); if not hrp then return end
-    hrp.CFrame = CFrame.new(pos+Vector3.new(0,3,0))
-    hrp.AssemblyLinearVelocity = Vector3.zero
-    notify("🍀 TP: "..tostring(nm))
-end
-local function lkRec(nm,pos)
-    lastLk = {name=nm,pos=pos}
-    local co = string.format("%.1f, %.1f, %.1f",pos.X,pos.Y,pos.Z)
-    local r = new("Frame",{Size=UDim2.new(1,0,0,48),BackgroundColor3=T.Row,BorderSizePixel=0},lkLst)
-    rnd(r,10); strk(r,T.Str,2)
-    new("TextLabel",{Size=UDim2.new(1,-80,1,-6),Position=UDim2.new(0,10,0,3),BackgroundTransparency=1,Text=nm.."\n"..co,TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true},r)
-    local tpb = new("TextButton",{Size=UDim2.new(0,32,1,-10),Position=UDim2.new(1,-44,0,5),BackgroundColor3=T.Grn,Text="📍",TextColor3=T.Bg,Font=Enum.Font.GothamBlack,TextSize=14,BorderSizePixel=0,AutoButtonColor=false},r)
-    rnd(tpb,8)
-    tpb.MouseButton1Click:Connect(function() lkTP(pos,nm) end)
-end
-mkLabel(pLk,"— Lucky Block —",T.Grn)
-mkTog(pLk,"🍀 Auto-TP ao spawnar",false,function(on) lkAuto=on end)
-mkBtn(pLk,"🔍 Escanear agora",function()
-    local n = 0
-    for _,o in ipairs(workspace:GetDescendants()) do
-        if (o:IsA("Model") or o:IsA("BasePart")) and o.Name:lower():find(lkName,1,true) then
-            local pos = o:IsA("BasePart") and o.Position or (o.GetPivot and o:GetPivot().Position)
-            if pos and pos.Magnitude>1 then n+=1; lkRec(o.Name,pos); if n>=20 then break end end
-        end
-    end
-    notify("🍀 "..n.." lucky encontradas")
-end)
-mkLabel(pLk,"— Histórico —",T.Grn)
-lkLst = mkList(pLk)
-track(workspace.DescendantAdded:Connect(function(o)
-    if lkAuto and (o:IsA("Model") or o:IsA("BasePart")) and o.Name:lower():find(lkName,1,true) then
-        task.wait(1)
-        local pos = o:IsA("BasePart") and o.Position or (o.GetPivot and o:GetPivot().Position)
-        if pos and pos.Magnitude>1 then lkRec(o.Name,pos); lkTP(pos,o.Name) end
-    end
-end))
-
--- ========== ABA EXPLORER/SPY ==========
-local pEx = mkPage("explorer","🗺️ Explorer/Spy",7)
-local subB = new("Frame",{Size=UDim2.new(1,-6,0,36),BackgroundColor3=T.Top,BorderSizePixel=0},pEx)
-rnd(subB,10)
-new("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,4),VerticalAlignment=Enum.VerticalAlignment.Center},subB)
-new("UIPadding",{PaddingLeft=UDim.new(0,4)},subB)
-local bEx = new("TextButton",{Size=UDim2.new(0.5,-4,1,-8),BackgroundColor3=T.Pink,Text="🗺️ Explorer",TextColor3=T.Bg,Font=Enum.Font.GothamBold,TextSize=12,BorderSizePixel=0},subB)
-rnd(bEx,8)
-local bSp = new("TextButton",{Size=UDim2.new(0.5,-4,1,-8),BackgroundColor3=T.Row,Text="📡 Spy",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,BorderSizePixel=0},subB)
-rnd(bSp,8)
-
-local exC = new("Frame",{Size=UDim2.new(1,-6,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y},pEx)
-new("UIListLayout",{Padding=UDim.new(0,6)},exC)
-local spC = new("Frame",{Size=UDim2.new(1,-6,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y,Visible=false},pEx)
-new("UIListLayout",{Padding=UDim.new(0,6)},spC)
-bEx.MouseButton1Click:Connect(function() exC.Visible=true; spC.Visible=false; bEx.BackgroundColor3=T.Pink; bEx.TextColor3=T.Bg; bSp.BackgroundColor3=T.Row; bSp.TextColor3=T.Tx end)
-bSp.MouseButton1Click:Connect(function() exC.Visible=false; spC.Visible=true; bSp.BackgroundColor3=T.Pink; bSp.TextColor3=T.Bg; bEx.BackgroundColor3=T.Row; bEx.TextColor3=T.Tx end)
-
--- Explorer
-mkLabel(exC,"— Explorer —",T.Grn)
-local exSrc, exFil, exEnt = 1, "", {}
-local srcN = {"Workspace","ReplicatedStorage","Lighting"}
-local srcR = {workspace,RS,game:GetService("Lighting")}
-local exCnt, exLst
-local function renderEx()
-    clrList(exLst)
-    local sh = 0
-    for _,o in ipairs(exEnt) do
-        if exFil=="" or o.Name:lower():find(exFil,1,true) or o.ClassName:lower():find(exFil,1,true) then
-            if sh<60 then sh+=1
-                local ids = getIds(o)
-                local txt = "["..o.ClassName.."] "..o.Name.."\n"..o:GetFullName()..(ids~="" and ("\n"..ids) or "")
-                mkRow(exLst,txt,T.Tx,{
-                    {"📍",function() tpTo(o) end},
-                    {"📋",function() clip(o:GetFullName()) end},
-                },58)
-            end
-        end
-    end
-    exCnt.Text = sh.." de "..#exEnt
-end
-local sB
-sB = mkBtn(exC,"📂 Fonte: Workspace",function()
-    exSrc = exSrc%#srcR+1
-    sB.Text = "  📂 Fonte: "..srcN[exSrc]
-    local ok2,l = pcall(function() return srcR[exSrc]:GetDescendants() end)
-    exEnt = ok2 and l or {}
-    renderEx()
-end)
-mkSrch(exC,"Nome ou classe",function(t) exFil=t:lower(); renderEx() end)
-mkBtn(exC,"🔄 Escanear",function()
-    local ok2,l = pcall(function() return srcR[exSrc]:GetDescendants() end)
-    exEnt = ok2 and l or {}
-    renderEx()
-end)
-exCnt = mkLabel(exC,"Toque Escanear",T.Gray,20)
-exLst = mkList(exC)
-task.spawn(function()
-    local ok2,l = pcall(function() return srcR[exSrc]:GetDescendants() end)
-    exEnt = ok2 and l or {}
-    renderEx()
-end)
-
--- Spy
-mkLabel(spC,"— Spy (recebidos) —",T.Grn)
-local spLst = mkList(spC)
-local spN = 0
-local spConns = {}
-local function addSpy(r,...)
-    if spN>50 then return end
-    spN+=1
-    local a = {}
-    for i=1,select("#",...) do local v=select(i,...); a[i]=typeof(v)=="Instance" and ("<"..v.ClassName..":"..v.Name..">") or tostring(v) end
-    mkRow(spLst,"← "..r:GetFullName().."("..table.concat(a,", ")..")",T.Grn,{},44)
-end
-mkTog(spC,"📥 Capturar eventos recebidos",false,function(on)
-    for _,c in ipairs(spConns) do c:Disconnect() end
-    spConns = {}
-    if on then
-        for _,o in ipairs(game:GetDescendants()) do
-            if o:IsA("RemoteEvent") then
-                spConns[#spConns+1] = o.OnClientEvent:Connect(function(...) addSpy(o,...) end)
-            end
-        end
-    end
-end)
-mkBtn(spC,"🧹 Limpar",function() clrList(spLst); spN=0 end)
-
--- ========== ABA CÓDIGO/DIAG/LOG ==========
-local pCDL = mkPage("cdl","💻 Código/Diag/Log",8)
-local subC = new("Frame",{Size=UDim2.new(1,-6,0,36),BackgroundColor3=T.Top,BorderSizePixel=0},pCDL)
-rnd(subC,10)
-new("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,4),VerticalAlignment=Enum.VerticalAlignment.Center},subC)
-new("UIPadding",{PaddingLeft=UDim.new(0,4)},subC)
-local bC = new("TextButton",{Size=UDim2.new(0.33,-3,1,-8),BackgroundColor3=T.Pink,Text="💻 Código",TextColor3=T.Bg,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0},subC)
-rnd(bC,8)
-local bD = new("TextButton",{Size=UDim2.new(0.33,-3,1,-8),BackgroundColor3=T.Row,Text="📊 Diag",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0},subC)
-rnd(bD,8)
-local bL = new("TextButton",{Size=UDim2.new(0.33,-3,1,-8),BackgroundColor3=T.Row,Text="🐞 Log",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0},subC)
-rnd(bL,8)
-local cC = new("Frame",{Size=UDim2.new(1,-6,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y},pCDL)
-new("UIListLayout",{Padding=UDim.new(0,6)},cC)
-local cD = new("Frame",{Size=UDim2.new(1,-6,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y,Visible=false},pCDL)
-new("UIListLayout",{Padding=UDim.new(0,6)},cD)
-local cL = new("Frame",{Size=UDim2.new(1,-6,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y,Visible=false},pCDL)
-new("UIListLayout",{Padding=UDim.new(0,6)},cL)
-bC.MouseButton1Click:Connect(function() cC.Visible=true; cD.Visible=false; cL.Visible=false; bC.BackgroundColor3=T.Pink; bC.TextColor3=T.Bg; bD.BackgroundColor3=T.Row; bD.TextColor3=T.Tx; bL.BackgroundColor3=T.Row; bL.TextColor3=T.Tx end)
-bD.MouseButton1Click:Connect(function() cC.Visible=false; cD.Visible=true; cL.Visible=false; bD.BackgroundColor3=T.Pink; bD.TextColor3=T.Bg; bC.BackgroundColor3=T.Row; bC.TextColor3=T.Tx; bL.BackgroundColor3=T.Row; bL.TextColor3=T.Tx end)
-bL.MouseButton1Click:Connect(function() cC.Visible=false; cD.Visible=false; cL.Visible=true; bL.BackgroundColor3=T.Pink; bL.TextColor3=T.Bg; bC.BackgroundColor3=T.Row; bC.TextColor3=T.Tx; bD.BackgroundColor3=T.Row; bD.TextColor3=T.Tx end)
-
-mkLabel(cC,"— Scripts do cliente —",T.Grn)
-mkBtn(cC,"📜 Listar scripts",function()
-    if not getscripts then return notify("⚠️ Executor sem getscripts") end
-    local ok2,s = pcall(getscripts)
-    if not ok2 then return notify("❌ Falha") end
-    notify("📜 "..tostring(#s).." scripts")
-end)
-local codeLst = mkList(cC)
-mkBtn(cC,"🔄 Limpar",function() clrList(codeLst) end)
-
-mkLabel(cD,"— Info do Mapa —",T.Grn)
-local diagI = new("TextLabel",{Size=UDim2.new(1,-6,0,200),BackgroundColor3=T.Row,Text="Toque em Analisar",TextColor3=T.Gray,Font=Enum.Font.Code,TextSize=11,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,BorderSizePixel=0},cD)
-rnd(diagI,12); strk(diagI,T.Str,2)
-new("UIPadding",{PaddingLeft=UDim.new(0,6),PaddingTop=UDim.new(0,4),PaddingRight=UDim.new(0,6)},diagI)
-mkBtn(cD,"🔬 Analisar Mapa",function()
-    diagI.Text = "Analisando..."
-    task.spawn(function()
-        local p,m,s = 0,0,0
-        for _,o in ipairs(workspace:GetDescendants()) do
-            if o:IsA("BasePart") then p+=1
-            elseif o:IsA("Model") then m+=1
-            elseif o:IsA("LuaSourceContainer") then s+=1 end
-        end
-        diagI.Text = string.format("PlaceId: %s\nJogadores: %d/%d\nStreaming: %s\nGravidade: %.1f\nVoid: %d\n\nParts: %d\nModels: %d\nScripts: %d",tostring(game.PlaceId),#Players:GetPlayers(),Players.MaxPlayers,tostring(workspace.StreamingEnabled),workspace.Gravity,workspace.FallenPartsDestroyHeight,p,m,s)
-        diagI.TextColor3 = T.Tx
-    end)
-end)
-
-mkLabel(cL,"— Log —",T.Grn)
-local logLst = mkList(cL)
-local logN = 0
-local function addLog(msg,t)
-    if logN>60 then return end
-    logN+=1
-    local col = (t==Enum.MessageType.MessageError) and T.Red or (t==Enum.MessageType.MessageWarning) and T.Yel or T.Gray
-    local l = new("TextLabel",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundColor3=T.Row,BorderSizePixel=0,Text=msg,TextColor3=col,Font=Enum.Font.Code,TextSize=11,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left},logLst)
-    rnd(l,6)
-    new("UIPadding",{PaddingLeft=UDim.new(0,6),PaddingRight=UDim.new(0,6),PaddingTop=UDim.new(0,3),PaddingBottom=UDim.new(0,3)},l)
-end
-pcall(function() for _,h in ipairs(LogS:GetLogHistory()) do addLog(h.message,h.messageType) end end)
-track(LogS.MessageOut:Connect(addLog))
-mkBtn(cL,"🧹 Limpar",function() clrList(logLst); logN=0 end)
-
--- ========== ABA ADM ==========
-local pAd = mkPage("admin","🔐 ADM",9)
-local lF = new("Frame",{Size=UDim2.new(1,-6,0,200),BackgroundTransparency=1},pAd)
-new("UIListLayout",{Padding=UDim.new(0,6)},lF)
-mkLabel(lF,"Senha: admin123",T.Grn,30)
-local pB = new("TextBox",{Size=UDim2.new(1,0,0,40),BackgroundColor3=T.Row,PlaceholderText="Digite a senha...",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=14,BorderSizePixel=0},lF)
-rnd(pB,10); strk(pB,T.Str,2)
-mkBtn(lF,"🔓 Entrar",function()
-    if pB.Text=="admin123" then notify("✅ Login OK"); lF.Visible=false
-    else notify("❌ Senha errada") end
-end)
-
--- ========== CLEANUP ==========
-env.PCClean = function()
-    stopFly()
-    isFarm = false; lkAuto = false
-    if farmTh then pcall(task.cancel,farmTh) end
-    for _,c in ipairs(conns) do pcall(function() c:Disconnect() end) end
-end
-
-selTab("players")
-print("[Painel v32] Carregado! 🌸")
