@@ -316,77 +316,59 @@ local function allCandy()
     return l
 end
 
--- 👇 ANDA ATÉ O ITEM (em vez de teleportar pra cima)
-local function walkTo(targetPos, opts)
+-- 🚀 DESLIZA até o doce: teleporta quase em cima + desliza os últimos studs
+local function slideTo(targetPos, opts)
     opts = opts or {}
     local hrp = getHRP()
     if not hrp then return false end
 
-    local stopDist = opts.stopDist or 3          -- para a X studs do item
-    local stepTime = opts.stepTime or 0.08       -- tempo de cada passo
-    local maxTime  = opts.maxTime  or 15         -- tempo máximo andando (segurança)
-    local speed    = opts.speed    or 22         -- studs por passo (velocidade do "andar")
+    local stopDist = opts.stopDist or 2.5
+    local stepTime = opts.stepTime or 0.03   -- MUITO rápido
+    local stepSize = opts.stepSize or 6      -- studs por tick
+    local maxTime  = opts.maxTime  or 4
 
     local start = tick()
-    local humanoid = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
-
     while tick() - start < maxTime do
         hrp = getHRP()
         if not hrp then return false end
 
         local cur = hrp.Position
         local delta = targetPos - cur
-        local dist = Vector3.new(delta.X, 0, delta.Z).Magnitude
+        local flat = Vector3.new(delta.X, 0, delta.Z)
+        local dist = flat.Magnitude
 
+        -- cola no doce (mesma altura dele) quando perto
         if dist <= stopDist then
-            return true   -- chegou perto o suficiente
+            hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 1.5, 0))
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            return true
         end
 
-        -- direção no plano XZ (sem subir/descer)
-        local dir = Vector3.new(delta.X, 0, delta.Z).Unit
-        local moveDist = math.min(speed * stepTime, dist - stopDist)
-
-        -- move mantendo a altura do chão (Raycast pra não subir na parede)
-        local nextPos = cur + dir * moveDist
-        local rayParams = RaycastParams.new()
-        rayParams.FilterDescendantsInstances = {LP.Character}
-        rayParams.FilterType = Enum.RaycastFilterType.Exclude
-        local ray = workspace:Raycast(Vector3.new(nextPos.X, cur.Y + 6, nextPos.Z), Vector3.new(0, -20, 0), rayParams)
-
-        if ray then
-            nextPos = Vector3.new(nextPos.X, ray.Position.Y + (hrp.Size.Y / 2) + 0.5, nextPos.Z)
+        -- se está MUITO longe, salta direto pra 10 studs de distância (não 200)
+        if dist > 60 then
+            local dir = flat.Unit
+            local near = targetPos - dir * 8 + Vector3.new(0, 2, 0)
+            hrp.CFrame = CFrame.new(near, near + dir)
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            task.wait(0.05)
+        else
+            -- desliza rápido na direção do doce (mantém altura do doce)
+            local dir = flat.Unit
+            local moveDist = math.min(stepSize, dist - stopDist)
+            local nextPos = cur + dir * moveDist
+            nextPos = Vector3.new(nextPos.X, targetPos.Y + 1.5, nextPos.Z)
+            hrp.CFrame = CFrame.new(nextPos, nextPos + dir)
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            task.wait(stepTime)
         end
-
-        hrp.CFrame = CFrame.new(nextPos, nextPos + dir)
-        hrp.AssemblyLinearVelocity = Vector3.zero
-
-        -- deixa o pulo desativado pra não bugar
-        if humanoid then
-            humanoid.Jump = false
-        end
-
-        task.wait(stepTime)
     end
     return false
 end
 
--- versão antiga do teleporte mantida como fallback (para distâncias gigantes)
-local function fastTP(pos)
-    local hrp = getHRP(); if not hrp then return end
-    local d = (pos - hrp.Position).Magnitude
-    if d > 200 then  -- se está MUITO longe, teleporta parcial pra não demorar demais
-        local dr = (pos - hrp.Position).Unit
-        for i = 1, 4 do
-            hrp.CFrame = hrp.CFrame + dr * (d / 5)
-            task.wait(0.08)
-        end
-    end
-end
-
-mkTog(pFm,"🍬 Auto-Farm Candy (andando)",false,function(on)
+mkTog(pFm,"🍬 Auto-Farm Candy (rápido)",false,function(on)
     isFarm = on
     if on then
-        notify("🍬 Farm ligado (andando até o doce)")
+        notify("🍬 Farm ligado")
         farmTh = task.spawn(function()
             while isFarm and SG.Parent do
                 local c = allCandy()
@@ -395,18 +377,12 @@ mkTog(pFm,"🍬 Auto-Farm Candy (andando)",false,function(on)
                     if t and t.Parent then
                         local pos = t:IsA("BasePart") and t.Position or (t.GetPivot and t:GetPivot().Position)
                         if pos then
-                            fastTP(pos)                       -- teleporta só se estiver MUITO longe
-                            walkTo(pos, {stopDist = 3.5, stepTime = 0.06, speed = 22})
-                            task.wait(0.15)
+                            slideTo(pos, {stopDist = 2.5, stepTime = 0.03, stepSize = 6})
 
-                            -- coleta via remote do jogo
                             local r = nil
                             pcall(function() r = RS.Features.HalloweenCandy.Remotes.Pickup end)
-                            if r then
-                                pcall(function() r:InvokeServer(t:GetAttribute("CandyId") or t.Name) end)
-                            end
+                            if r then pcall(function() r:InvokeServer(t:GetAttribute("CandyId") or t.Name) end) end
 
-                            -- fallback: tocar no item se tiver TouchTransmitter
                             local hrp = getHRP()
                             if hrp and firetouchinterest then
                                 local part = t:IsA("BasePart") and t or t:FindFirstChildWhichIsA("BasePart", true)
@@ -417,13 +393,13 @@ mkTog(pFm,"🍬 Auto-Farm Candy (andando)",false,function(on)
                                     end)
                                 end
                             end
-                            task.wait(0.3)
+                            task.wait(0.15)
                         end
                     end
                 else
-                    task.wait(1)
+                    task.wait(0.5)
                 end
-                task.wait(0.1)
+                task.wait(0.05)
             end
         end)
     else
@@ -432,22 +408,30 @@ mkTog(pFm,"🍬 Auto-Farm Candy (andando)",false,function(on)
     end
 end)
 
--- opções extras
-mkLabel(pFm,"— Ajustes do caminhar —",T.Grn)
-local distBox = new("TextBox",{Size=UDim2.new(1,-6,0,38),BackgroundColor3=T.Row,PlaceholderText="Distância pra parar (padrão 3.5)",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=13,ClearTextOnFocus=false,BorderSizePixel=0},pFm)
-rnd(distBox,12); strk(distBox,T.Str,2)
-env.FarmStopDist = 3.5
+-- ajustes rápidos
+mkLabel(pFm,"— Ajustes (deixe em branco p/ padrão) —",T.Grn)
+local distBox = new("TextBox",{Size=UDim2.new(1,-6,0,36),BackgroundColor3=T.Row,PlaceholderText="Distância do doce (padrão 2.5)",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,ClearTextOnFocus=false,BorderSizePixel=0},pFm)
+rnd(distBox,10); strk(distBox,T.Str,2)
+env.FarmDist = 2.5
 distBox.FocusLost:Connect(function()
     local n = tonumber(distBox.Text)
-    if n then env.FarmStopDist = math.clamp(n, 1, 20); notify("🍬 Para a "..env.FarmStopDist.." studs") end
+    if n then env.FarmDist = math.clamp(n, 1, 15); notify("🍬 Distância: "..env.FarmDist) end
 end)
 
-local spdBox = new("TextBox",{Size=UDim2.new(1,-6,0,38),BackgroundColor3=T.Row,PlaceholderText="Velocidade do andar (padrão 22)",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=13,ClearTextOnFocus=false,BorderSizePixel=0},pFm)
-rnd(spdBox,12); strk(spdBox,T.Str,2)
-env.FarmSpeed = 22
+local spdBox = new("TextBox",{Size=UDim2.new(1,-6,0,36),BackgroundColor3=T.Row,PlaceholderText="Velocidade do passo (padrão 6)",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,ClearTextOnFocus=false,BorderSizePixel=0},pFm)
+rnd(spdBox,10); strk(spdBox,T.Str,2)
+env.FarmStep = 6
 spdBox.FocusLost:Connect(function()
     local n = tonumber(spdBox.Text)
-    if n then env.FarmSpeed = math.clamp(n, 5, 100); notify("🍬 Velocidade: "..env.FarmSpeed) end
+    if n then env.FarmStep = math.clamp(n, 1, 30); notify("🍬 Passo: "..env.FarmStep) end
+end)
+
+local timeBox = new("TextBox",{Size=UDim2.new(1,-6,0,36),BackgroundColor3=T.Row,PlaceholderText="Delay entre passos (padrão 0.03s)",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,ClearTextOnFocus=false,BorderSizePixel=0},pFm)
+rnd(timeBox,10); strk(timeBox,T.Str,2)
+env.FarmStepTime = 0.03
+timeBox.FocusLost:Connect(function()
+    local n = tonumber(timeBox.Text)
+    if n then env.FarmStepTime = math.clamp(n, 0.01, 0.5); notify("🍬 Delay: "..env.FarmStepTime.."s") end
 end)
 
 -- ========== ABA LUCKY ==========
