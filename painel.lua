@@ -489,3 +489,250 @@ mkTog(pFm,"🍬 Auto-Farm Candy",false,function(on)
                 else
                     task.wait(1)
                 end
+                task.wait(0.1)
+            end
+        end)
+    else
+        notify("⛔ Farm desligado")
+        if currentTween then currentTween:Cancel() end
+        if farmTh then pcall(task.cancel, farmTh) end
+    end
+end)
+
+mkLabel(pFm,"— Ajustes —",T.Grn)
+local delayBox = new("TextBox",{Size=UDim2.new(1,-6,0,38),BackgroundColor3=T.Row,PlaceholderText="Delay entre itens (padrão 0.5s)",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=13,ClearTextOnFocus=false,BorderSizePixel=0},pFm)
+rnd(delayBox,12); strk(delayBox,T.Str,2)
+delayBox.FocusLost:Connect(function()
+    local n = tonumber(delayBox.Text)
+    if n then itemWaitTime = math.clamp(n, 0.1, 5); notify("🍬 Delay: "..itemWaitTime.."s") end
+end)
+
+local velBox = new("TextBox",{Size=UDim2.new(1,-6,0,38),BackgroundColor3=T.Row,PlaceholderText="Velocidade do voo (padrão 350)",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=13,ClearTextOnFocus=false,BorderSizePixel=0},pFm)
+rnd(velBox,12); strk(velBox,T.Str,2)
+velBox.FocusLost:Connect(function()
+    local n = tonumber(velBox.Text)
+    if n then flySpeed = math.clamp(n, 50, 2000); notify("🍬 Velocidade: "..flySpeed) end
+end)
+
+mkBtn(pFm,"🔄 Zerar contador",function() itemsCollected = 0; notify("🍬 Contador zerado") end)
+
+-- ========== ABA LUCKY ==========
+local pLk = mkPage("lucky","🍀 Lucky",6)
+local lkName = "lucky"
+local lkAuto = false
+local lastLk, lkLst
+
+local function lkTP(pos,nm)
+    local hrp = getHRP(); if not hrp then return end
+    hrp.CFrame = CFrame.new(pos+Vector3.new(0,3,0))
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    notify("🍀 TP: "..tostring(nm))
+end
+local function lkRec(nm,pos)
+    lastLk = {name=nm,pos=pos}
+    local co = string.format("%.1f, %.1f, %.1f",pos.X,pos.Y,pos.Z)
+    local r = new("Frame",{Size=UDim2.new(1,0,0,48),BackgroundColor3=T.Row,BorderSizePixel=0},lkLst)
+    rnd(r,10); strk(r,T.Str,2)
+    new("TextLabel",{Size=UDim2.new(1,-80,1,-6),Position=UDim2.new(0,10,0,3),BackgroundTransparency=1,Text=nm.."\n"..co,TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true},r)
+    local tpb = new("TextButton",{Size=UDim2.new(0,32,1,-10),Position=UDim2.new(1,-44,0,5),BackgroundColor3=T.Grn,Text="📍",TextColor3=T.Bg,Font=Enum.Font.GothamBlack,TextSize=14,BorderSizePixel=0,AutoButtonColor=false},r)
+    rnd(tpb,8)
+    tpb.MouseButton1Click:Connect(function() lkTP(pos,nm) end)
+end
+mkLabel(pLk,"— Lucky Block —",T.Grn)
+mkTog(pLk,"🍀 Auto-TP ao spawnar",false,function(on) lkAuto=on end)
+mkBtn(pLk,"🔍 Escanear agora",function()
+    local n = 0
+    for _,o in ipairs(workspace:GetDescendants()) do
+        if (o:IsA("Model") or o:IsA("BasePart")) and o.Name:lower():find(lkName,1,true) then
+            local pos = o:IsA("BasePart") and o.Position or (o.GetPivot and o:GetPivot().Position)
+            if pos and pos.Magnitude>1 then n+=1; lkRec(o.Name,pos); if n>=20 then break end end
+        end
+    end
+    notify("🍀 "..n.." lucky encontradas")
+end)
+mkLabel(pLk,"— Histórico —",T.Grn)
+lkLst = mkList(pLk)
+track(workspace.DescendantAdded:Connect(function(o)
+    if lkAuto and (o:IsA("Model") or o:IsA("BasePart")) and o.Name:lower():find(lkName,1,true) then
+        task.wait(1)
+        local pos = o:IsA("BasePart") and o.Position or (o.GetPivot and o:GetPivot().Position)
+        if pos and pos.Magnitude>1 then lkRec(o.Name,pos); lkTP(pos,o.Name) end
+    end
+end))
+
+-- ========== ABA EXPLORER/SPY ==========
+local pEx = mkPage("explorer","🗺️ Explorer/Spy",7)
+local subB = new("Frame",{Size=UDim2.new(1,-6,0,36),BackgroundColor3=T.Top,BorderSizePixel=0},pEx)
+rnd(subB,10)
+new("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,4),VerticalAlignment=Enum.VerticalAlignment.Center},subB)
+new("UIPadding",{PaddingLeft=UDim.new(0,4)},subB)
+local bEx = new("TextButton",{Size=UDim2.new(0.5,-4,1,-8),BackgroundColor3=T.Pink,Text="🗺️ Explorer",TextColor3=T.Bg,Font=Enum.Font.GothamBold,TextSize=12,BorderSizePixel=0},subB)
+rnd(bEx,8)
+local bSp = new("TextButton",{Size=UDim2.new(0.5,-4,1,-8),BackgroundColor3=T.Row,Text="📡 Spy",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=12,BorderSizePixel=0},subB)
+rnd(bSp,8)
+
+local exC = new("Frame",{Size=UDim2.new(1,-6,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y},pEx)
+new("UIListLayout",{Padding=UDim.new(0,6)},exC)
+local spC = new("Frame",{Size=UDim2.new(1,-6,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y,Visible=false},pEx)
+new("UIListLayout",{Padding=UDim.new(0,6)},spC)
+bEx.MouseButton1Click:Connect(function() exC.Visible=true; spC.Visible=false; bEx.BackgroundColor3=T.Pink; bEx.TextColor3=T.Bg; bSp.BackgroundColor3=T.Row; bSp.TextColor3=T.Tx end)
+bSp.MouseButton1Click:Connect(function() exC.Visible=false; spC.Visible=true; bSp.BackgroundColor3=T.Pink; bSp.TextColor3=T.Bg; bEx.BackgroundColor3=T.Row; bEx.TextColor3=T.Tx end)
+
+-- Explorer
+mkLabel(exC,"— Explorer —",T.Grn)
+local exSrc, exFil, exEnt = 1, "", {}
+local srcN = {"Workspace","ReplicatedStorage","Lighting"}
+local srcR = {workspace,RS,game:GetService("Lighting")}
+local exCnt, exLst
+local function renderEx()
+    clrList(exLst)
+    local sh = 0
+    for _,o in ipairs(exEnt) do
+        if exFil=="" or o.Name:lower():find(exFil,1,true) or o.ClassName:lower():find(exFil,1,true) then
+            if sh<60 then sh+=1
+                local ids = getIds(o)
+                local txt = "["..o.ClassName.."] "..o.Name.."\n"..o:GetFullName()..(ids~="" and ("\n"..ids) or "")
+                mkRow(exLst,txt,T.Tx,{
+                    {"📍",function() tpTo(o) end},
+                    {"📋",function() clip(o:GetFullName()) end},
+                },58)
+            end
+        end
+    end
+    exCnt.Text = sh.." de "..#exEnt
+end
+local sB
+sB = mkBtn(exC,"📂 Fonte: Workspace",function()
+    exSrc = exSrc%#srcR+1
+    sB.Text = "  📂 Fonte: "..srcN[exSrc]
+    local ok2,l = pcall(function() return srcR[exSrc]:GetDescendants() end)
+    exEnt = ok2 and l or {}
+    renderEx()
+end)
+mkSrch(exC,"Nome ou classe",function(t) exFil=t:lower(); renderEx() end)
+mkBtn(exC,"🔄 Escanear",function()
+    local ok2,l = pcall(function() return srcR[exSrc]:GetDescendants() end)
+    exEnt = ok2 and l or {}
+    renderEx()
+end)
+exCnt = mkLabel(exC,"Toque Escanear",T.Gray,20)
+exLst = mkList(exC)
+task.spawn(function()
+    local ok2,l = pcall(function() return srcR[exSrc]:GetDescendants() end)
+    exEnt = ok2 and l or {}
+    renderEx()
+end)
+
+-- Spy
+mkLabel(spC,"— Spy (recebidos) —",T.Grn)
+local spLst = mkList(spC)
+local spN = 0
+local spConns = {}
+local function addSpy(r,...)
+    if spN>50 then return end
+    spN+=1
+    local a = {}
+    for i=1,select("#",...) do local v=select(i,...); a[i]=typeof(v)=="Instance" and ("<"..v.ClassName..":"..v.Name..">") or tostring(v) end
+    mkRow(spLst,"← "..r:GetFullName().."("..table.concat(a,", ")..")",T.Grn,{},44)
+end
+mkTog(spC,"📥 Capturar eventos recebidos",false,function(on)
+    for _,c in ipairs(spConns) do c:Disconnect() end
+    spConns = {}
+    if on then
+        for _,o in ipairs(game:GetDescendants()) do
+            if o:IsA("RemoteEvent") then
+                spConns[#spConns+1] = o.OnClientEvent:Connect(function(...) addSpy(o,...) end)
+            end
+        end
+    end
+end)
+mkBtn(spC,"🧹 Limpar",function() clrList(spLst); spN=0 end)
+
+-- ========== ABA CÓDIGO/DIAG/LOG ==========
+local pCDL = mkPage("cdl","💻 Código/Diag/Log",8)
+local subC = new("Frame",{Size=UDim2.new(1,-6,0,36),BackgroundColor3=T.Top,BorderSizePixel=0},pCDL)
+rnd(subC,10)
+new("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,4),VerticalAlignment=Enum.VerticalAlignment.Center},subC)
+new("UIPadding",{PaddingLeft=UDim.new(0,4)},subC)
+local bC = new("TextButton",{Size=UDim2.new(0.33,-3,1,-8),BackgroundColor3=T.Pink,Text="💻 Código",TextColor3=T.Bg,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0},subC)
+rnd(bC,8)
+local bD = new("TextButton",{Size=UDim2.new(0.33,-3,1,-8),BackgroundColor3=T.Row,Text="📊 Diag",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0},subC)
+rnd(bD,8)
+local bL = new("TextButton",{Size=UDim2.new(0.33,-3,1,-8),BackgroundColor3=T.Row,Text="🐞 Log",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0},subC)
+rnd(bL,8)
+local cC = new("Frame",{Size=UDim2.new(1,-6,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y},pCDL)
+new("UIListLayout",{Padding=UDim.new(0,6)},cC)
+local cD = new("Frame",{Size=UDim2.new(1,-6,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y,Visible=false},pCDL)
+new("UIListLayout",{Padding=UDim.new(0,6)},cD)
+local cL = new("Frame",{Size=UDim2.new(1,-6,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y,Visible=false},pCDL)
+new("UIListLayout",{Padding=UDim.new(0,6)},cL)
+bC.MouseButton1Click:Connect(function() cC.Visible=true; cD.Visible=false; cL.Visible=false; bC.BackgroundColor3=T.Pink; bC.TextColor3=T.Bg; bD.BackgroundColor3=T.Row; bD.TextColor3=T.Tx; bL.BackgroundColor3=T.Row; bL.TextColor3=T.Tx end)
+bD.MouseButton1Click:Connect(function() cC.Visible=false; cD.Visible=true; cL.Visible=false; bD.BackgroundColor3=T.Pink; bD.TextColor3=T.Bg; bC.BackgroundColor3=T.Row; bC.TextColor3=T.Tx; bL.BackgroundColor3=T.Row; bL.TextColor3=T.Tx end)
+bL.MouseButton1Click:Connect(function() cC.Visible=false; cD.Visible=false; cL.Visible=true; bL.BackgroundColor3=T.Pink; bL.TextColor3=T.Bg; bC.BackgroundColor3=T.Row; bC.TextColor3=T.Tx; bD.BackgroundColor3=T.Row; bD.TextColor3=T.Tx end)
+
+mkLabel(cC,"— Scripts do cliente —",T.Grn)
+mkBtn(cC,"📜 Listar scripts",function()
+    if not getscripts then return notify("⚠️ Executor sem getscripts") end
+    local ok2,s = pcall(getscripts)
+    if not ok2 then return notify("❌ Falha") end
+    notify("📜 "..tostring(#s).." scripts")
+end)
+local codeLst = mkList(cC)
+mkBtn(cC,"🔄 Limpar",function() clrList(codeLst) end)
+
+mkLabel(cD,"— Info do Mapa —",T.Grn)
+local diagI = new("TextLabel",{Size=UDim2.new(1,-6,0,200),BackgroundColor3=T.Row,Text="Toque em Analisar",TextColor3=T.Gray,Font=Enum.Font.Code,TextSize=11,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,BorderSizePixel=0},cD)
+rnd(diagI,12); strk(diagI,T.Str,2)
+new("UIPadding",{PaddingLeft=UDim.new(0,6),PaddingTop=UDim.new(0,4),PaddingRight=UDim.new(0,6)},diagI)
+mkBtn(cD,"🔬 Analisar Mapa",function()
+    diagI.Text = "Analisando..."
+    task.spawn(function()
+        local p,m,s = 0,0,0
+        for _,o in ipairs(workspace:GetDescendants()) do
+            if o:IsA("BasePart") then p+=1
+            elseif o:IsA("Model") then m+=1
+            elseif o:IsA("LuaSourceContainer") then s+=1 end
+        end
+        diagI.Text = string.format("PlaceId: %s\nJogadores: %d/%d\nStreaming: %s\nGravidade: %.1f\nVoid: %d\n\nParts: %d\nModels: %d\nScripts: %d",tostring(game.PlaceId),#Players:GetPlayers(),Players.MaxPlayers,tostring(workspace.StreamingEnabled),workspace.Gravity,workspace.FallenPartsDestroyHeight,p,m,s)
+        diagI.TextColor3 = T.Tx
+    end)
+end)
+
+mkLabel(cL,"— Log —",T.Grn)
+local logLst = mkList(cL)
+local logN = 0
+local function addLog(msg,t)
+    if logN>60 then return end
+    logN+=1
+    local col = (t==Enum.MessageType.MessageError) and T.Red or (t==Enum.MessageType.MessageWarning) and T.Yel or T.Gray
+    local l = new("TextLabel",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundColor3=T.Row,BorderSizePixel=0,Text=msg,TextColor3=col,Font=Enum.Font.Code,TextSize=11,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left},logLst)
+    rnd(l,6)
+    new("UIPadding",{PaddingLeft=UDim.new(0,6),PaddingRight=UDim.new(0,6),PaddingTop=UDim.new(0,3),PaddingBottom=UDim.new(0,3)},l)
+end
+pcall(function() for _,h in ipairs(LogS:GetLogHistory()) do addLog(h.message,h.messageType) end end)
+track(LogS.MessageOut:Connect(addLog))
+mkBtn(cL,"🧹 Limpar",function() clrList(logLst); logN=0 end)
+
+-- ========== ABA ADM ==========
+local pAd = mkPage("admin","🔐 ADM",9)
+local lF = new("Frame",{Size=UDim2.new(1,-6,0,200),BackgroundTransparency=1},pAd)
+new("UIListLayout",{Padding=UDim.new(0,6)},lF)
+mkLabel(lF,"Senha: admin123",T.Grn,30)
+local pB = new("TextBox",{Size=UDim2.new(1,0,0,40),BackgroundColor3=T.Row,PlaceholderText="Digite a senha...",PlaceholderColor3=T.Gray,Text="",TextColor3=T.Tx,Font=Enum.Font.GothamBold,TextSize=14,BorderSizePixel=0},lF)
+rnd(pB,10); strk(pB,T.Str,2)
+mkBtn(lF,"🔓 Entrar",function()
+    if pB.Text=="admin123" then notify("✅ Login OK"); lF.Visible=false
+    else notify("❌ Senha errada") end
+end)
+
+-- ========== CLEANUP ==========
+env.PCClean = function()
+    stopFly()
+    isFarm = false; lkAuto = false
+    if currentTween then currentTween:Cancel() end
+    if farmTh then pcall(task.cancel,farmTh) end
+    for _,c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+end
+
+selTab("players")
+print("[Painel v32] Carregado! 🌸")
