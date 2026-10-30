@@ -1,4 +1,4 @@
--- Execute no seu executor (Versão Silenciosa / Anti-Kick)
+-- Execute no seu executor (Versão Imunidade Total / Stealth)
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,7 +35,7 @@ UICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-Title.Text = "  🔍 Stealth Panel (Anti-Detection)"
+Title.Text = "  🛡️ Stealth & Absolute Godmode"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.GothamBold
@@ -59,7 +59,7 @@ local LogText = Instance.new("TextLabel")
 LogText.Size = UDim2.new(1, -10, 1, 0)
 LogText.Position = UDim2.new(0, 5, 0, 0)
 LogText.BackgroundTransparency = 1
-LogText.Text = "Modo Silencioso Ativo.\nClique em 'Escanear Mapa' abaixo."
+LogText.Text = "Painel ativado.\nAtive 'Godmode Total' para imunidade completa a mortes."
 LogText.TextColor3 = Color3.fromRGB(200, 200, 200)
 LogText.TextSize = 13
 LogText.Font = Enum.Font.Code
@@ -83,7 +83,7 @@ local BtnCorner1 = Instance.new("UICorner")
 BtnCorner1.CornerRadius = UDim.new(0, 6)
 BtnCorner1.Parent = ScanButton
 
--- Botão Godmode Discreto
+-- Botão Godmode Total (Sem Morte)
 local GodButton = Instance.new("TextButton")
 GodButton.Size = UDim2.new(0.46, 0, 0, 35)
 GodButton.Position = UDim2.new(0.52, 0, 1, -145)
@@ -133,14 +133,14 @@ local InfoLabel = Instance.new("TextLabel")
 InfoLabel.Size = UDim2.new(1, -20, 0, 35)
 InfoLabel.Position = UDim2.new(0, 10, 1, -45)
 InfoLabel.BackgroundTransparency = 1
-InfoLabel.Text = "Modo Stealth: Bypassing anti-cheat checks."
+InfoLabel.Text = "Proteção contra morte por Dano e Hitbox Ativada."
 InfoLabel.TextColor3 = Color3.fromRGB(130, 130, 140)
 InfoLabel.TextSize = 10
 InfoLabel.Font = Enum.Font.Gotham
 InfoLabel.Parent = MainFrame
 
 --------------------------------------------------------------------------------
--- FUNÇÕES DISCRETAS
+-- FUNÇÕES DE IMUNIDADE E CONTROLE
 --------------------------------------------------------------------------------
 
 ScanButton.MouseButton1Click:Connect(function()
@@ -156,32 +156,82 @@ ScanButton.MouseButton1Click:Connect(function()
 		contagem.Models, contagem.Parts, contagem.ParticleEmitters, contagem.RemoteEvents, contagem.BindableEvents)
 end)
 
--- Godmode Discreto (Só restaura se tomar dano real, evitando checagem constante agressiva)
+-- SISTEMA DE GODMODE ABSOLUTO
 local godmodeAtivo, conexaoGodmode = false, nil
+
+local function aplicarImunidadePersonagem(char)
+	if not char then return end
+	local hum = char:WaitForChild("Humanoid", 3)
+	if hum then
+		-- Desativa o estado de Morte no Humanoid
+		hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+		
+		-- Impede a vida de zerar
+		hum.Health = hum.MaxHealth
+	end
+	
+	-- Torna as partes do corpo insensíveis a toques de dano (Hitboxes de ataque não registram)
+	for _, part in ipairs(char:GetChildren()) do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			part.CanTouch = false
+		end
+	end
+end
+
 GodButton.MouseButton1Click:Connect(function()
 	godmodeAtivo = not godmodeAtivo
 	if godmodeAtivo then
 		GodButton.Text = "Godmode: ON"
 		GodButton.BackgroundColor3 = Color3.fromRGB(60, 200, 80)
-		conexaoGodmode = RunService.Heartbeat:Connect(function()
+		
+		aplicarImunidadePersonagem(localPlayer.Character)
+		
+		conexaoGodmode = RunService.Stepped:Connect(function()
 			local char = localPlayer.Character
-			if char and char:FindFirstChildOfClass("Humanoid") then
+			if char then
 				local hum = char:FindFirstChildOfClass("Humanoid")
-				if hum.Health > 0 and hum.Health < hum.MaxHealth then
-					hum.Health = hum.MaxHealth
+				if hum then
+					if hum.Health < hum.MaxHealth then
+						hum.Health = hum.MaxHealth
+					end
+					if hum:GetState() == Enum.HumanoidStateType.Dead then
+						hum:ChangeState(Enum.HumanoidStateType.Running)
+					end
 				end
 			end
 		end)
+		
+		LogText.Text = "[GODMODE] Imunidade Absoluta ATIVADA!"
 	else
 		GodButton.Text = "Godmode: OFF"
 		GodButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
 		if conexaoGodmode then conexaoGodmode:Disconnect() conexaoGodmode = nil end
+		
+		local char = localPlayer.Character
+		if char then
+			local hum = char:FindFirstChildOfClass("Humanoid")
+			if hum then hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true) end
+			for _, part in ipairs(char:GetChildren()) do
+				if part:IsA("BasePart") then part.CanTouch = true end
+			end
+		end
+		
+		LogText.Text = "[GODMODE] Imunidade DESATIVADA."
 	end
 end)
 
--- Velocidade CFrame Discreta (Não altera WalkSpeed, logo o Anti-Cheat não dá Kick)
+-- Re-aplica a imunidade caso o personagem renasça
+localPlayer.CharacterAdded:Connect(function(novoChar)
+	if godmodeAtivo then
+		task.wait(0.5)
+		aplicarImunidadePersonagem(novoChar)
+	end
+end)
+
+-- VELOCIDADE CFRAME DISCRETA
 local speedAtivo, conexaoSpeed = false, nil
-local multiplicador = 1.4 -- Ajuste leve e seguro para não levantar suspeitas
+local multiplicador = 1.4
+
 SpeedButton.MouseButton1Click:Connect(function()
 	speedAtivo = not speedAtivo
 	if speedAtivo then
@@ -204,7 +254,7 @@ SpeedButton.MouseButton1Click:Connect(function()
 	end
 end)
 
--- TP Aleatório Seguro
+-- TP ALEATÓRIO SEGURO
 TpButton.MouseButton1Click:Connect(function()
 	local char = localPlayer.Character
 	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -217,7 +267,7 @@ TpButton.MouseButton1Click:Connect(function()
 	if #partes > 0 then
 		local escolhida = partes[math.random(1, #partes)]
 		char.HumanoidRootPart.CFrame = escolhida.CFrame + Vector3.new(0, 5, 0)
-		LogText.Text = "TP discreto para: " .. escolhida.Name
+		LogText.Text = "TP efetuado para: " .. escolhida.Name
 	else
 		LogText.Text = "Nenhuma parte válida encontrada."
 	end
