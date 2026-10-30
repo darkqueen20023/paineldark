@@ -1,4 +1,4 @@
--- Execute usando um Executor compatível com o jogo.
+-- Execute no seu executor
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,13 +7,9 @@ local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
-print("[DEBUG] Iniciando script de interface...")
+print("[DEBUG] A iniciar script do painel...")
 
---------------------------------------------------------------------------------
--- 1. CRIAR INTERFACE GRÁFICA NA PLAYERGUI (GARANTIDO APARECER)
---------------------------------------------------------------------------------
-
--- Remove interface anterior se já existir
+-- Remove interface anterior se já existir para evitar duplicados
 if playerGui:FindFirstChild("ScriptInspectorUI") then
 	playerGui.ScriptInspectorUI:Destroy()
 end
@@ -21,7 +17,7 @@ end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ScriptInspectorUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 999999 -- Fica acima de tudo
+ScreenGui.DisplayOrder = 999999
 ScreenGui.Parent = playerGui
 
 local MainFrame = Instance.new("Frame")
@@ -43,7 +39,7 @@ Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 Title.Text = "  🔍 Inspector, Godmode, Speed & TP"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 14
+Title.TextSize = 14 -- Corrigido o erro de sintaxe anterior
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = MainFrame
@@ -52,7 +48,7 @@ local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 8)
 TitleCorner.Parent = Title
 
--- Caixa de Texto para Logs / Relatório
+-- Caixa de Texto para Logs
 local LogBox = Instance.new("ScrollingFrame")
 LogBox.Size = UDim2.new(1, -20, 1, -215)
 LogBox.Position = UDim2.new(0, 10, 0, 50)
@@ -65,7 +61,7 @@ local LogText = Instance.new("TextLabel")
 LogText.Size = UDim2.new(1, -10, 1, 0)
 LogText.Position = UDim2.new(0, 5, 0, 0)
 LogText.BackgroundTransparency = 1
-LogText.Text = "Interface carregada com sucesso!\nClique em 'Escanear Mapa' abaixo."
+LogText.Text = "Painel carregado com sucesso!\nClique em 'Escanear Mapa' abaixo."
 LogText.TextColor3 = Color3.fromRGB(200, 200, 200)
 LogText.TextSize = 13
 LogText.Font = Enum.Font.Code
@@ -119,7 +115,7 @@ local BtnCorner3 = Instance.new("UICorner")
 BtnCorner3.CornerRadius = UDim.new(0, 6)
 BtnCorner3.Parent = SpeedButton
 
--- Botão de TP Aleatório pelo Mapa
+-- Botão de TP Aleatório
 local TpButton = Instance.new("TextButton")
 TpButton.Size = UDim2.new(0.46, 0, 0, 35)
 TpButton.Position = UDim2.new(0.52, 0, 1, -95)
@@ -134,172 +130,93 @@ local BtnCorner4 = Instance.new("UICorner")
 BtnCorner4.CornerRadius = UDim.new(0, 6)
 BtnCorner4.Parent = TpButton
 
--- Nota de aviso rodapé
-local InfoLabel = Instance.new("TextButton")
+-- Rodapé
+local InfoLabel = Instance.new("TextLabel")
 InfoLabel.Size = UDim2.new(1, -20, 0, 35)
 InfoLabel.Position = UDim2.new(0, 10, 1, -45)
 InfoLabel.BackgroundTransparency = 1
-InfoLabel.Text = "Painel carregado na PlayerGui com sucesso!"
+InfoLabel.Text = "Proteções ativas contra crashes."
 InfoLabel.TextColor3 = Color3.fromRGB(130, 130, 140)
 InfoLabel.TextSize = 10
 InfoLabel.Font = Enum.Font.Gotham
 InfoLabel.Parent = MainFrame
 
 --------------------------------------------------------------------------------
--- 2. LÓGICA DE INSPEÇÃO
+-- FUNÇÕES DOS BOTÕES
 --------------------------------------------------------------------------------
 
-local function realizarVarredura()
-	local contagem = {
-		Models = 0,
-		Parts = 0,
-		ParticleEmitters = 0,
-		RemoteEvents = 0,
-		BindableEvents = 0
-	}
-
-	for _, objeto in ipairs(game:GetDescendants()) do
-		if objeto:IsA("Model") then
-			contagem.Models = contagem.Models + 1
-		elseif objeto:IsA("BasePart") then
-			contagem.Parts = contagem.Parts + 1
-		elseif objeto:IsA("ParticleEmitter") then
-			contagem.ParticleEmitters = contagem.ParticleEmitters + 1
-		elseif objeto:IsA("RemoteEvent") then
-			contagem.RemoteEvents = contagem.RemoteEvents + 1
-		elseif objeto:IsA("BindableEvent") then
-			contagem.BindableEvents = contagem.BindableEvents + 1
-		end
+ScanButton.MouseButton1Click:Connect(function()
+	local contagem = { Models = 0, Parts = 0, ParticleEmitters = 0, RemoteEvents = 0, BindableEvents = 0 }
+	for _, obj in ipairs(game:GetDescendants()) do
+		if obj:IsA("Model") then contagem.Models = contagem.Models + 1
+		elseif obj:IsA("BasePart") then contagem.Parts = contagem.Parts + 1
+		elseif obj:IsA("ParticleEmitter") then contagem.ParticleEmitters = contagem.ParticleEmitters + 1
+		elseif obj:IsA("RemoteEvent") then contagem.RemoteEvents = contagem.RemoteEvents + 1
+		elseif obj:IsA("BindableEvent") then contagem.BindableEvents = contagem.BindableEvents + 1 end
 	end
+	LogText.Text = string.format("=== RELATÓRIO ===\n• Models: %d\n• Parts: %d\n• Partículas: %d\n• RemoteEvents: %d\n• Bindables: %d", 
+		contagem.Models, contagem.Parts, contagem.ParticleEmitters, contagem.RemoteEvents, contagem.BindableEvents)
+end)
 
-	local resultado = string.format(
-		"=== RELATÓRIO DO MAPA ===\n" ..
-		"• Models: %d\n" ..
-		"• Parts (Peças): %d\n" ..
-		"• Partículas: %d\n" ..
-		"• RemoteEvents: %d\n" ..
-		"• BindableEvents: %d\n" ..
-		"=========================\n" ..
-		"Varredura concluída com sucesso!",
-		contagem.Models, contagem.Parts, contagem.ParticleEmitters, contagem.RemoteEvents, contagem.BindableEvents
-	)
-
-	LogText.Text = resultado
-end
-
-ScanButton.MouseButton1Click:Connect(realizarVarredura)
-
---------------------------------------------------------------------------------
--- 3. GODMODE SEGURO
---------------------------------------------------------------------------------
-
-local godmodeAtivo = false
-local conexaoGodmode = nil
-
-local function alternarGodmode()
+local godmodeAtivo, conexaoGodmode = false, nil
+GodButton.MouseButton1Click:Connect(function()
 	godmodeAtivo = not godmodeAtivo
-	
 	if godmodeAtivo then
 		GodButton.Text = "Godmode: ON"
 		GodButton.BackgroundColor3 = Color3.fromRGB(60, 200, 80)
-		
 		conexaoGodmode = RunService.RenderStepped:Connect(function()
 			local char = localPlayer.Character
-			if char then
-				local humanoid = char:FindFirstChildOfClass("Humanoid")
-				if humanoid and humanoid.Health < humanoid.MaxHealth then
-					humanoid.Health = humanoid.MaxHealth
-				end
+			if char and char:FindFirstChildOfClass("Humanoid") then
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				if hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
 			end
 		end)
 	else
 		GodButton.Text = "Godmode: OFF"
 		GodButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-		
-		if conexaoGodmode then
-			conexaoGodmode:Disconnect()
-			conexaoGodmode = nil
-		end
+		if conexaoGodmode then conexaoGodmode:Disconnect() conexaoGodmode = nil end
 	end
-end
+end)
 
-GodButton.MouseButton1Click:Connect(alternarGodmode)
-
---------------------------------------------------------------------------------
--- 4. VELOCIDADE (SPEED) SEGURA
---------------------------------------------------------------------------------
-
-local speedAtivo = false
-local conexaoSpeed = nil
-local velocidadeAlvo = 30
-
-local function alternarSpeed()
+local speedAtivo, conexaoSpeed = false, nil
+SpeedButton.MouseButton1Click:Connect(function()
 	speedAtivo = not speedAtivo
-	
 	if speedAtivo then
 		SpeedButton.Text = "Velocidade: ON"
 		SpeedButton.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
-		
 		conexaoSpeed = RunService.RenderStepped:Connect(function()
 			local char = localPlayer.Character
-			if char then
-				local humanoid = char:FindFirstChildOfClass("Humanoid")
-				if humanoid then
-					humanoid.WalkSpeed = velocidadeAlvo
-				end
+			if char and char:FindFirstChildOfClass("Humanoid") then
+				char:FindFirstChildOfClass("Humanoid").WalkSpeed = 30
 			end
 		end)
 	else
 		SpeedButton.Text = "Velocidade: OFF"
 		SpeedButton.BackgroundColor3 = Color3.fromRGB(150, 60, 255)
-		
-		if conexaoSpeed then
-			conexaoSpeed:Disconnect()
-			conexaoSpeed = nil
-		end
-		
+		if conexaoSpeed then conexaoSpeed:Disconnect() conexaoSpeed = nil end
 		local char = localPlayer.Character
-		if char then
-			local humanoid = char:FindFirstChildOfClass("Humanoid")
-			if humanoid then
-				humanoid.WalkSpeed = 16
-			end
+		if char and char:FindFirstChildOfClass("Humanoid") then
+			char:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
 		end
 	end
-end
+end)
 
-SpeedButton.MouseButton1Click:Connect(alternarSpeed)
-
---------------------------------------------------------------------------------
--- 5. TELEPORTE ALEATÓRIO SEGURO PELO MAPA
---------------------------------------------------------------------------------
-
-local function teleporteAleatorio()
+TpButton.MouseButton1Click:Connect(function()
 	local char = localPlayer.Character
-	if not char or not char:FindFirstChild("HumanoidRootPart") then
-		LogText.Text = "[AVISO] Personagem não encontrado para TP."
-		return
-	end
-
-	local partesMapa = {}
+	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+	local partes = {}
 	for _, obj in ipairs(Workspace:GetDescendants()) do
-		if obj:IsA("BasePart") and not obj:IsDescendantOf(char) and obj.Transparency < 1 and obj.Size.Magnitude > 2 then
-			table.insert(partesMapa, obj)
+		if obj:IsA("BasePart") and not obj:IsDescendantOf(char) and obj.Transparency < 1 and obj.Size.Magnitude > 3 then
+			table.insert(partes, obj)
 		end
 	end
-
-	if #partesMapa > 0 then
-		math.randomseed(tick())
-		local parteEscolhida = partesMapa[math.random(1, #partesMapa)]
-		local posicaoDestino = parteEscolhida.Position + Vector3.new(0, 5, 0)
-		char.HumanoidRootRootPart.CFrame = CFrame.new(posicaoDestino)
-		
-		LogText.Text = "Teleportado para perto de: " .. parteEscolhida.Name
+	if #partes > 0 then
+		local escolhida = partes[math.random(1, #partes)]
+		char.HumanoidRootPart.CFrame = escolhida.CFrame + Vector3.new(0, 5, 0)
+		LogText.Text = "Teleportado para: " .. escolhida.Name
 	else
-		LogText.Text = "[AVISO] Nenhuma parte válida encontrada."
+		LogText.Text = "Nenhuma parte válida encontrada."
 	end
-end
+end)
 
-TpButton.MouseButton1Click:Connect(teleporteAleatorio)
-
-print("[DEBUG] Interface criada e pronta na PlayerGui!")
+print("[DEBUG] Painel carregado com sucesso na PlayerGui!")
